@@ -15,5 +15,5 @@ check_and_install_packages <- function(req_file = "requirements.txt") {
     }
   }
   
-  message("✅ All required packages are installed and up to date.")
+  message("All required packages are installed and up to date.")
 }
