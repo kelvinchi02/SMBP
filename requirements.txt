@@ -1,1 +1,7 @@
-
+data.table
+plotly
+ggrepel
+ggplot2
+sf
+scales
+lubridate
