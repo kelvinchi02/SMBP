@@ -1,5 +1,7 @@
-source("main_finction.R")
-source("mainfunction.R")
+install.packages(readLines("requirements.txt"))
+
+source("main_function.R")
+source("database_connection.R")
 load_github_repo(branch = "main")
 
 

@@ -1,3 +1,7 @@
+library(dotenv)
+
+load_dot_env(".env")
+
 supabase_url <- Sys.getenv("SUPABASE_URL")
 supabase_key <- Sys.getenv("SUPABASE_KEY")
 
