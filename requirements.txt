@@ -5,3 +5,5 @@ ggplot2
 sf
 scales
 lubridate
+httr2
+jsonlite
