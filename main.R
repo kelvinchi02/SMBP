@@ -1,5 +1,6 @@
 library(jsonlite)
 
+# Load Github Repo R Scripts
 load_github_repo <- function(branch = "main") {
   repo_api <- paste0(
     "https://api.github.com/repos/kelvinchi02/SMBP/contents?ref=",
@@ -25,12 +26,17 @@ load_github_repo <- function(branch = "main") {
   message("All R scripts loaded successfully.")
 }
 
-install.packages(readLines("requirements.txt"))
+load_github_repo("main")
+#----------------------------------------------------------
+# check requirements and install missing packages
+req_url <- "https://raw.githubusercontent.com/kelvinchi02/SMBP/main/requirements.txt"
+reqs <- readLines(req_url)
+reqs <- trimws(reqs)
+reqs <- reqs[reqs != ""]
+install.packages(reqs)
 
 
-
-source("database_connection.R")
 
 info <- load_supabase_table("SmartTransit_Integrated")
 
-head(info)
+print(dim(info))
