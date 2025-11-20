@@ -1,3 +1,10 @@
+supabase_url <- Sys.getenv("SUPABASE_URL")
+supabase_key <- Sys.getenv("SUPABASE_KEY")
+
+if (supabase_url == "" || supabase_key == "") {
+  stop("Missing SUPABASE_URL or SUPABASE_KEY in your environment.")
+}
+
 
 load_supabase_table <- function(table_name) {
   
