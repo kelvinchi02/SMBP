@@ -17,8 +17,12 @@ source("ridership.R")
 source("hour.R")
 source("chat.R")
 
-
+if (file.exists(".env")) {
+  load_dot_env(".env")
+}
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
+
+
 nav_card <- function(id, icon_name, title, subtitle) {
   div(
     class = "nav-card",
