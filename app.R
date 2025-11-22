@@ -133,48 +133,55 @@ ui <- page_fluid(
   tags$head(
     tags$style(HTML("
       @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-      
+
       body {
         font-family: 'Poppins', sans-serif;
         background-color: #f8f9fa;
       }
 
+      /* ---------------- LOGIN PAGE ---------------- */
+
       .login-container::before {
-      content: '';
-      position: absolute;
-      top: 0; right: 0; bottom: 0; left: 0;
-      background-color: rgba(0,0,0,0.55);
-      z-index: 0;
+        content: '';
+        position: absolute;
+        top: 0; right: 0; bottom: 0; left: 0;
+        background-color: rgba(0,0,0,0.55);
+        z-index: 0;
       }
 
-    .login-title {
-      font-size: 4rem;
-      font-weight: 800;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      background: linear-gradient(135deg, #ffffff 0%, #d0ecff 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      text-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
-    }
+      .login-title {
+        font-size: 4rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        background: linear-gradient(135deg, #ffffff 0%, #d0ecff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
+        margin: 0;
+        padding: 0;
+      }
 
-    .login-input {
-      background-color: rgba(255, 255, 255, 0.92);
-      color: #222 !important;
-      border: 1px solid rgba(255, 255, 255, 0.7);
-      border-radius: 10px;
-      padding: 0.9rem;
-      font-size: 1rem;
-    }
+      .login-input {
+        background-color: rgba(255, 255, 255, 0.92);
+        color: #222 !important;
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        border-radius: 10px;
+        padding: 0.9rem;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+      }
 
-    .login-label {
-      color: rgba(255, 255, 255, 0.95);
-      font-weight: 600;
-      font-size: 1rem;
-      margin-bottom: 0.3rem;
-      text-align: left;
-    }
+      .login-label {
+        color: rgba(255, 255, 255, 0.95);
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 0.3rem;
+        text-align: left;
+        width: 100%;
+      }
 
+      /* ---------------- HOME PAGE ---------------- */
 
       .home-container {
         background-image: url('bk.webp');
@@ -242,14 +249,8 @@ ui <- page_fluid(
       }
 
       @keyframes fadeInDown {
-        from {
-          opacity: 0;
-          transform: translateY(-30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(-30px); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
       .nav-card {
@@ -262,7 +263,6 @@ ui <- page_fluid(
         cursor: pointer;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         color: #333;
-        text-shadow: none;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
       }
 
@@ -317,6 +317,8 @@ ui <- page_fluid(
         margin-bottom: 0;
       }
 
+      /* ---------------- ADDITIONAL UI ELEMENTS (YOU REQUESTED) ---------------- */
+
       .custom-card {
         border: 1px solid #e9ecef;
         border-radius: 10px;
@@ -364,10 +366,11 @@ ui <- page_fluid(
   ),
 
   uiOutput("gate"),
-  
-  # Add chat UI
+
   chat_ui()
 )
+
+
 
 # Server logic
 server <- function(input, output, session) {
