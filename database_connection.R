@@ -1,19 +1,3 @@
-library(dotenv)
-library(httr2)
-library(data.table)
-library(lubridate)
-
-if (file.exists(".env")) {
-  load_dot_env(".env")
-}
-
-supabase_url <- Sys.getenv("SUPABASE_URL")
-supabase_key <- Sys.getenv("SUPABASE_KEY")
-
-if (supabase_url == "" || supabase_key == "") {
-  stop("Missing SUPABASE_URL or SUPABASE_KEY in your environment.")
-}
-
 load_supabase_table <- function(table_name) {
 
   endpoint <- paste0(supabase_url, "/rest/v1/", table_name, "?select=*")
@@ -26,7 +10,12 @@ load_supabase_table <- function(table_name) {
 
   resp <- req_perform(req)
 
-  dt <- as.data.table(resp_body_json(resp))
+  # 🔥 FIX: Proper JSON -> Data frame
+  raw <- resp_body_json(resp, simplifyVector = TRUE)
+  dt  <- as.data.table(raw)
+
+  print("Columns loaded from Supabase:")
+  print(colnames(dt))
 
   # ------------  CLEAN DATATYPES  -----------------
 
@@ -77,13 +66,11 @@ load_supabase_table <- function(table_name) {
     weather_hourly_conditions  = "character"
   )
 
-  # Apply conversions
   for (col in names(type_map)) {
     if (col %in% names(dt)) {
       dt[[col]] <- convert_safe(dt[[col]], type_map[[col]])
     }
   }
-
 
   return(dt)
 }
