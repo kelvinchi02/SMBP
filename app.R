@@ -367,7 +367,6 @@ ui <- page_fluid(
 
   uiOutput("gate"),
 
-  chat_ui()
 )
 
 
@@ -396,7 +395,10 @@ server <- function(input, output, session) {
     if (!logged_in()) {
       login_ui()
     } else {
-      uiOutput("main_content")
+      tagList(
+        uiOutput("main_content"),
+        chat_ui()
+      )
     }
   })
 
