@@ -74,7 +74,7 @@ login_ui <- function() {
               style = "color: white; font-weight: 300; margin-bottom: 2rem;"),
 
       div(class = "login-label", "Username"),
-      textInput("login_user", NULL, value = "",
+      textInput("login_user", NULL, value = "admin1",
                 placeholder = "Enter username", class = "login-input"),
 
       div(class = "login-label", "Password"),
@@ -137,6 +137,43 @@ ui <- page_fluid(
         font-family: 'Poppins', sans-serif;
         background-color: #f8f9fa;
       }
+
+      .login-container::before {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background-color: rgba(0,0,0,0.55);
+      z-index: 0;
+      }
+
+    .login-title {
+      font-size: 4rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #ffffff 0%, #d0ecff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    .login-input {
+      background-color: rgba(255, 255, 255, 0.92);
+      color: #222 !important;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 10px;
+      padding: 0.9rem;
+      font-size: 1rem;
+    }
+
+    .login-label {
+      color: rgba(255, 255, 255, 0.95);
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 0.3rem;
+      text-align: left;
+    }
+
 
       .home-container {
         background-image: url('bk.webp');
