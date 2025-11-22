@@ -7,11 +7,13 @@ library(scales)
 library(lubridate)
 library(shiny)
 
+source("database_connection.R")
+
 back_button <- actionButton("back_to_home", "← Back to Home", class = "btn-light mb-4")
 
 Sys.setlocale("LC_TIME", "en_US.UTF-8")
 
-fread("SmartTransit_Integrated.csv") -> info
+info <- load_supabase_table("SmartTransit_Integrated")
 
 info[, hour := hour(scheduled_arrival)]
 info[, hour := factor(hour, levels = sort(unique(hour)))]
