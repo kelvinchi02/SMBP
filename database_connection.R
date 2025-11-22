@@ -28,4 +28,7 @@ load_supabase_table <- function(table_name) {
   # Parse JSON → data.table
   data <- resp_body_json(resp)
   as.data.table(data)
+
+  print("Columns loaded from Supabase:")
+  print(colnames(data))
 }
