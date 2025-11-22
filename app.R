@@ -139,8 +139,7 @@ ui <- page_fluid(
         background-color: #f8f9fa;
       }
 
-      /* ---------------- LOGIN PAGE ---------------- */
-
+      /* LOGIN PAGE */
       .login-container::before {
         content: '';
         position: absolute;
@@ -158,8 +157,6 @@ ui <- page_fluid(
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         text-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
-        margin: 0;
-        padding: 0;
       }
 
       .login-input {
@@ -181,8 +178,7 @@ ui <- page_fluid(
         width: 100%;
       }
 
-      /* ---------------- HOME PAGE ---------------- */
-
+      /* HOME PAGE */
       .home-container {
         background-image: url('bk.webp');
         background-size: cover;
@@ -200,23 +196,22 @@ ui <- page_fluid(
       .home-container::before {
         content: '';
         position: absolute;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        left: 0;
+        top: 0; right: 0; bottom: 0; left: 0;
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 0;
       }
 
-      .home-container > * {
-        position: relative;
-        z-index: 1;
-      }
+      .home-container > * { position: relative; z-index: 1; }
 
       .title-section {
         text-align: center;
         margin-bottom: 3rem;
         animation: fadeInDown 0.8s ease-out;
+      }
+
+      @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-30px); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
       .main-title {
@@ -228,16 +223,11 @@ ui <- page_fluid(
         background: linear-gradient(135deg, #ffffff 0%, #e0f7ff 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        background-clip: text;
-        text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        line-height: 1.2;
       }
 
       .sub-title {
         font-size: 1.8rem;
         font-weight: 300;
-        letter-spacing: 0.15em;
-        margin: 0.5rem 0 1.5rem 0;
         color: rgba(255, 255, 255, 0.95);
       }
 
@@ -245,79 +235,28 @@ ui <- page_fluid(
         font-size: 1.1rem;
         font-weight: 400;
         color: rgba(255, 255, 255, 0.85);
-        margin: 0;
-      }
-
-      @keyframes fadeInDown {
-        from { opacity: 0; transform: translateY(-30px); }
-        to { opacity: 1; transform: translateY(0); }
       }
 
       .nav-card {
         padding: 1.5rem;
         text-align: center;
-        border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 12px;
         background-color: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
         cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        color: #333;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
       }
 
       .nav-card:hover {
         transform: translateY(-8px);
-        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
-        background-color: rgba(255, 255, 255, 0.85);
-      }
-
-      .nav-card h5 {
-        font-size: 1rem;
-        margin-top: 0.75rem;
-      }
-
-      .nav-card p {
-        font-size: 0.85rem;
       }
 
       .about-footer {
         margin-top: 4rem;
         padding-top: 2rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
         text-align: center;
-        max-width: 900px;
-        margin-left: auto;
-        margin-right: auto;
       }
 
-      .about-title {
-        font-size: 0.85rem;
-        font-weight: 600;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.9);
-        margin-bottom: 1rem;
-      }
-
-      .about-content {
-        font-size: 0.7rem;
-        line-height: 1.6;
-        color: rgba(255, 255, 255, 0.7);
-        font-weight: 300;
-      }
-
-      .about-content p {
-        margin-bottom: 0.8rem;
-        text-align: justify;
-        text-justify: inter-word;
-      }
-
-      .about-content p:last-child {
-        margin-bottom: 0;
-      }
-
-      /* ---------------- ADDITIONAL UI ELEMENTS (YOU REQUESTED) ---------------- */
+      .about-content p:last-child { margin-bottom: 0; }
 
       .custom-card {
         border: 1px solid #e9ecef;
@@ -328,30 +267,6 @@ ui <- page_fluid(
       .custom-card .card-header {
         background-color: #f8f9fa;
         border-bottom: 1px solid #e9ecef;
-        font-weight: 500;
-      }
-
-      .route-card-body {
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
-        padding: 1.5rem;
-      }
-
-      .route-icon {
-        font-size: 2.5rem;
-        width: 60px;
-        text-align: center;
-      }
-
-      .route-details h5 {
-        font-weight: 600;
-        margin-bottom: 0.25rem;
-      }
-
-      .route-details p {
-        margin-bottom: 0;
-        color: #6c757d;
       }
 
       .footer {
@@ -359,14 +274,11 @@ ui <- page_fluid(
         padding-top: 1.5rem;
         font-size: 0.9rem;
         color: #6c757d;
-        border-top: 1px solid #e9ecef;
-        margin-top: 2rem;
       }
     "))
   ),
 
-  uiOutput("gate"),
-
+  uiOutput("gate")
 )
 
 
