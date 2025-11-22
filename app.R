@@ -82,7 +82,8 @@ login_ui <- function() {
                     class = "login-input"),
 
       actionButton("login_btn", "Login", class = "btn btn-primary",
-                   style = "width: 100%; margin-top: 1.2rem;")
+                   style = "width: 100%; margin-top: 1.2rem;"),
+      uiOutput("login_error")
     )
   )
 }
