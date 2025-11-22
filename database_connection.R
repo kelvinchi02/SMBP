@@ -1,5 +1,28 @@
+library(dotenv)
+library(httr2)
+library(data.table)
+library(lubridate)
+
+# -------- ENVIRONMENT VARIABLE HANDLING ---------
+
+# Local development only
+if (file.exists(".env")) {
+  load_dot_env(".env")
+}
+
+# Always pull from environment (Posit Cloud + local)
+supabase_url <- Sys.getenv("SUPABASE_URL")
+supabase_key <- Sys.getenv("SUPABASE_KEY")
+
+if (supabase_url == "" || supabase_key == "") {
+  stop("Missing SUPABASE_URL or SUPABASE_KEY in your environment.")
+}
+
+# -------- FUNCTION TO LOAD TABLE FROM SUPABASE ---------
+
 load_supabase_table <- function(table_name) {
 
+  # Build endpoint
   endpoint <- paste0(supabase_url, "/rest/v1/", table_name, "?select=*")
 
   req <- request(endpoint) |>
@@ -10,22 +33,23 @@ load_supabase_table <- function(table_name) {
 
   resp <- req_perform(req)
 
-  # 🔥 FIX: Proper JSON -> Data frame
+  # 🔥 FIX 1: Proper JSON -> data.frame conversion
   raw <- resp_body_json(resp, simplifyVector = TRUE)
   dt  <- as.data.table(raw)
 
+  # Debug print
   print("Columns loaded from Supabase:")
   print(colnames(dt))
 
-  # ------------  CLEAN DATATYPES  -----------------
+  # --------- COLUMN TYPE CORRECTION ---------
 
   convert_safe <- function(col, type) {
     switch(type,
-      "POSIXct" = ymd_hms(col, quiet = TRUE),
-      "Date"    = ymd(col, quiet = TRUE),
-      "integer" = suppressWarnings(as.integer(col)),
-      "numeric" = suppressWarnings(as.numeric(col)),
-      "logical" = as.logical(col),
+      "POSIXct"  = ymd_hms(col, quiet = TRUE),
+      "Date"     = ymd(col, quiet = TRUE),
+      "integer"  = suppressWarnings(as.integer(col)),
+      "numeric"  = suppressWarnings(as.numeric(col)),
+      "logical"  = as.logical(col),
       "character" = as.character(col),
       col
     )
