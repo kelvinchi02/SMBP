@@ -38,7 +38,6 @@ nav_card <- function(id, icon_name, title, subtitle) {
 }
 
 
-
 login_ui <- function() {
   div(
     class = "login-container",
@@ -70,23 +69,50 @@ login_ui <- function() {
       tags$h1("SMART", class = "login-title"),
       tags$h1("BUS", class = "login-title", style = "margin-bottom: 1rem;"),
 
-      tags$h3("Management Platform Login",
-              style = "color: white; font-weight: 300; margin-bottom: 2rem;"),
+      tags$h3(
+        "Management Platform Login",
+        style = "color: white; font-weight: 300; margin-bottom: 2rem;"
+      ),
 
+      # Username label
       div(class = "login-label", "Username"),
-      textInput("login_user", NULL, value = "admin1",
-                placeholder = "Enter username", class = "login-input"),
 
+      # Username input wrapped to allow CSS
+      div(
+        class = "login-input",
+        textInput(
+          inputId = "login_user",
+          label = NULL,
+          value = "admin1",
+          placeholder = "Enter username"
+        )
+      ),
+
+      # Password label
       div(class = "login-label", "Password"),
-      passwordInput("login_pass", NULL, placeholder = "Enter password",
-                    class = "login-input"),
 
-      actionButton("login_btn", "Login", class = "btn btn-primary",
-                   style = "width: 100%; margin-top: 1.2rem;"),
+      # Password input wrapped to allow CSS
+      div(
+        class = "login-input",
+        passwordInput(
+          inputId = "login_pass",
+          label = NULL,
+          placeholder = "Enter password"
+        )
+      ),
+
+      actionButton(
+        "login_btn",
+        "Login",
+        class = "btn btn-primary",
+        style = "width: 100%; margin-top: 1.2rem;"
+      ),
+
       uiOutput("login_error")
     )
   )
 }
+
 
 # Home page UI
 home_ui <- function() {
