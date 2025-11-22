@@ -41,22 +41,48 @@ nav_card <- function(id, icon_name, title, subtitle) {
 
 login_ui <- function() {
   div(
-    class = "home-container",
-    style = "justify-content:center; align-items:center; text-align:center;",
+    class = "login-container",
+    style = "
+      background-image: url('bk.webp');
+      background-size: cover;
+      background-position: center;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      padding: 2rem;
+    ",
 
     div(
-      style = "max-width: 400px; margin:auto; background:rgba(255,255,255,0.8);
-               padding:30px; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.2);",
+      class = "login-box",
+      style = "
+        background: rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(12px);
+        padding: 3rem 2.5rem;
+        border-radius: 18px;
+        width: 420px;
+        text-align: center;
+        position: relative;
+        z-index: 1;
+      ",
 
-      h1("SMART BUS", class = "main-title"),
-      h3("Management Platform Login", style="color:#333; font-weight:300; margin-bottom:25px;"),
+      tags$h1("SMART", class = "login-title"),
+      tags$h1("BUS", class = "login-title", style = "margin-bottom: 1rem;"),
 
-      textInput("login_user", "Username", placeholder = "Enter username"),
-      passwordInput("login_pass", "Password", placeholder = "Enter password"),
+      tags$h3("Management Platform Login",
+              style = "color: white; font-weight: 300; margin-bottom: 2rem;"),
 
-      actionButton("login_btn", "Login", class = "btn btn-primary", style="width:100%; margin-top:10px;"),
+      div(class = "login-label", "Username"),
+      textInput("login_user", NULL, value = "",
+                placeholder = "Enter username", class = "login-input"),
 
-      uiOutput("login_error")
+      div(class = "login-label", "Password"),
+      passwordInput("login_pass", NULL, placeholder = "Enter password",
+                    class = "login-input"),
+
+      actionButton("login_btn", "Login", class = "btn btn-primary",
+                   style = "width: 100%; margin-top: 1.2rem;")
     )
   )
 }
