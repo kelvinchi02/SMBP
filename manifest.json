@@ -2669,7 +2669,7 @@
         "Maintainer": "Aron Atkins <aron@posit.co>",
         "Repository": "CRAN",
         "Date/Publication": "2025-11-18 14:20:02 UTC",
-        "Built": "R 4.4.2; ; 2025-11-22 03:57:54 UTC; windows"
+        "Built": "R 4.4.2; ; 2025-11-22 04:37:29 UTC; windows"
       }
     },
     "rstudioapi": {
@@ -3563,10 +3563,10 @@
   },
   "files": {
     ".env": {
-      "checksum": "2cc6dec9aec9bb0b5b59245159673157"
+      "checksum": "8183811c7fc1eea59304554386e92a51"
     },
     "app.R": {
-      "checksum": "b8806486ea5a7b910a388222c3ecc516"
+      "checksum": "5d6baac98127dd6b898adb24cbe29608"
     },
     "chat.R": {
       "checksum": "b1a79fb257e098f983a3d1e0c0970a85"
@@ -3578,7 +3578,7 @@
       "checksum": "1b8b26b5b9c0b407b64fd534deaa6c93"
     },
     "database_connection.R": {
-      "checksum": "08c991f3dfd4e0f67ee4ada0d11b2be1"
+      "checksum": "0b79c6d6f1bb8324e9d28f740831abea"
     },
     "hour.R": {
       "checksum": "70a1c6f7898b2d8ed1a0f305df154179"
@@ -3590,13 +3590,10 @@
       "checksum": "3ab0039b6c81efe4e52bca8365195bf6"
     },
     "pre.R": {
-      "checksum": "3f165cd41df6bfad4537bc94537cc15f"
+      "checksum": "03b38658362cd2ef66fd05cd5e25e34a"
     },
     "README.md": {
       "checksum": "ae3399b2f94591dae884857ffe24a879"
-    },
-    "requirements.txt": {
-      "checksum": "8617bb9d8e055bc315b07d8214353879"
     },
     "ridership.R": {
       "checksum": "58aeaa6325f4c77ac9f94532e63f6ad2"
