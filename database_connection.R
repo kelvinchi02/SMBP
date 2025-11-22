@@ -84,8 +84,6 @@ load_supabase_table <- function(table_name) {
     }
   }
 
-  print("✓ Cleaned column types:")
-  print(str(dt))
 
   return(dt)
 }
