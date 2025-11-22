@@ -1,6 +1,7 @@
 library(dotenv)
 library(httr2)
 library(data.table)
+library(lubridate)
 
 if (file.exists(".env")) {
   load_dot_env(".env")
@@ -25,13 +26,66 @@ load_supabase_table <- function(table_name) {
 
   resp <- req_perform(req)
 
-  raw <- resp_body_json(resp, check_type = FALSE)
+  dt <- as.data.table(resp_body_json(resp))
 
-  # Convert list of rows → proper data.table
-  dt <- rbindlist(raw, fill = TRUE)
+  # ------------  CLEAN DATATYPES  -----------------
 
-  message("Columns loaded from Supabase:")
-  print(colnames(dt))
+  convert_safe <- function(col, type) {
+    switch(type,
+      "POSIXct" = ymd_hms(col, quiet = TRUE),
+      "Date"    = ymd(col, quiet = TRUE),
+      "integer" = suppressWarnings(as.integer(col)),
+      "numeric" = suppressWarnings(as.numeric(col)),
+      "logical" = as.logical(col),
+      "character" = as.character(col),
+      col
+    )
+  }
+
+  type_map <- list(
+    datetime                   = "POSIXct",
+    service_date               = "Date",
+    route_id                   = "character",
+    route_name                 = "character",
+    trip_id                    = "character",
+    direction_id               = "integer",
+    direction_name             = "character",
+    stop_id                    = "character",
+    stop_name                  = "character",
+    stop_sequence              = "integer",
+    vehicle_id                 = "character",
+    scheduled_arrival          = "POSIXct",
+    actual_arrival             = "POSIXct",
+    delay_min                  = "numeric",
+    headway_min                = "numeric",
+    passengers_waiting         = "integer",
+    occupancy_rate             = "numeric",
+    peak                       = "character",
+    trip_start_time            = "character",
+    trip_end_time              = "character",
+    trip_vehicle_id            = "character",
+    vehicle_model              = "character",
+    vehicle_capacity           = "integer",
+    vehicle_wheelchair_capacity = "integer",
+    vehicle_bike_rack          = "logical",
+    stop_zone                  = "character",
+    route_long_name            = "character",
+    route_length_km            = "numeric",
+    route_color                = "character",
+    weather_temp_c             = "numeric",
+    weather_precip_mm          = "numeric",
+    weather_hourly_conditions  = "character"
+  )
+
+  # Apply conversions
+  for (col in names(type_map)) {
+    if (col %in% names(dt)) {
+      dt[[col]] <- convert_safe(dt[[col]], type_map[[col]])
+    }
+  }
+
+  print("✓ Cleaned column types:")
+  print(str(dt))
 
   return(dt)
 }
