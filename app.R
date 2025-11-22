@@ -7,6 +7,8 @@ library(shinyWidgets)
 library(leaflet)
 library(sf)
 library(dplyr)
+library(dotenv)
+
 
 source("pre.R")
 source("overview.R")
@@ -21,6 +23,8 @@ if (file.exists(".env")) {
   load_dot_env(".env")
 }
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
+valid_user <- Sys.getenv("LOGIN_USER")
+valid_pass <- Sys.getenv("LOGIN_PASS")
 
 
 nav_card <- function(id, icon_name, title, subtitle) {
@@ -30,6 +34,30 @@ nav_card <- function(id, icon_name, title, subtitle) {
     bs_icon(icon_name, size = "2.5rem"),
     h5(title, class = "mt-3"),
     p(subtitle, class = "text-muted")
+  )
+}
+
+
+
+login_ui <- function() {
+  div(
+    class = "home-container",
+    style = "justify-content:center; align-items:center; text-align:center;",
+
+    div(
+      style = "max-width: 400px; margin:auto; background:rgba(255,255,255,0.8);
+               padding:30px; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.2);",
+
+      h1("SMART BUS", class = "main-title"),
+      h3("Management Platform Login", style="color:#333; font-weight:300; margin-bottom:25px;"),
+
+      textInput("login_user", "Username", placeholder = "Enter username"),
+      passwordInput("login_pass", "Password", placeholder = "Enter password"),
+
+      actionButton("login_btn", "Login", class = "btn btn-primary", style="width:100%; margin-top:10px;"),
+
+      uiOutput("login_error")
+    )
   )
 }
 
@@ -271,7 +299,7 @@ ui <- page_fluid(
     "))
   ),
 
-  uiOutput("main_content"),
+  uiOutput("gate"),
   
   # Add chat UI
   chat_ui()
@@ -279,6 +307,33 @@ ui <- page_fluid(
 
 # Server logic
 server <- function(input, output, session) {
+
+  # ---------------- LOGIN SYSTEM ----------------
+  logged_in <- reactiveVal(FALSE)
+
+  observeEvent(input$login_btn, {
+    ok_user <- tolower(input$login_user) == tolower(valid_user)
+    ok_pass <- input$login_pass == valid_pass
+
+    if (ok_user && ok_pass) {
+      logged_in(TRUE)
+    } else {
+      output$login_error <- renderUI({
+        div(style = "color:red; margin-top:10px;", "Invalid username or password.")
+      })
+    }
+  })
+
+  # Gate: show login page first, then app
+  output$gate <- renderUI({
+    if (!logged_in()) {
+      login_ui()
+    } else {
+      uiOutput("main_content")
+    }
+  })
+
+ 
   current_view <- reactiveVal("home")
 
   observeEvent(input$view_selection, {
@@ -301,58 +356,38 @@ server <- function(input, output, session) {
     )
   })
 
-  # Chat message handler
+  # Chat handler
   observeEvent(input$chat_message, {
-    message <- input$chat_message$text
-    
-    # Call ChatGPT
-    response <- call_chatgpt(message, OPENAI_API_KEY)
-    
-    # Send response back to client
-    session$sendCustomMessage("chat_response", response)
+    msg <- input$chat_message$text
+    resp <- call_chatgpt(msg, OPENAI_API_KEY)
+    session$sendCustomMessage("chat_response", resp)
   })
 
   # Overview outputs
-  output$summaryOutputPlot1 <- renderPlot({
-    summary.plot1
-  })
-
-  output$summaryOutputPlot2 <- renderPlot({
-    summary.plot2
-  })
+  output$summaryOutputPlot1 <- renderPlot({ summary.plot1 })
+  output$summaryOutputPlot2 <- renderPlot({ summary.plot2 })
 
   output$summaryOutputPlot3 <- renderPlotly({
     crowding_data <- info[, .N, .(route_id, crowding_level)]
     create_crowding_pie(crowding_data, routes, input$summaryplot3whatRoute)
   })
 
+  # Map outputs
   output$mapPlotOut <- renderLeaflet({
     makemap(input$whatMapalpha)
   })
 
-  output$wea_hc_output <- renderHighchart({
-    table.wea
-  })
+  # Weather
+  output$wea_hc_output <- renderHighchart({ table.wea })
+  output$wea_gg_output1 <- renderPlot({ plot.wea1 })
+  output$wea_gg_output2 <- renderPlot({ plot.wea2 })
 
-  output$wea_gg_output1 <- renderPlot({
-    plot.wea1
-  })
+  # Crowding
+  output$crowd_ggplot1 <- renderPlotly({ crowd.plot2 })
+  output$crowd_ggplot2 <- renderPlot({ crowd.plot1 })
 
-  output$wea_gg_output2 <- renderPlot({
-    plot.wea2
-  })
-
-  output$crowd_ggplot1 <- renderPlotly({
-    crowd.plot2
-  })
-
-  output$crowd_ggplot2 <- renderPlot({
-    crowd.plot1
-  })
-
-  output$trendPlot <- renderPlot({
-    ride.plot2
-  })
+  # Ridership
+  output$trendPlot <- renderPlot({ ride.plot2 })
 
   output$mapTitle <- renderText({
     paste("Passengers onboard -", input$ride_date_select)
@@ -363,13 +398,12 @@ server <- function(input, output, session) {
     ggplotly(inter.p) |> hide_legend()
   })
 
-  output$hour_delay_plot1 <- renderPlot({
-    hour_plot1
-  })
-
+  # Hourly delay
+  output$hour_delay_plot1 <- renderPlot({ hour_plot1 })
   output$hour_delay_plot2 <- renderPlot({
     hour_plot2(input$hourwhatRoute)
   })
 }
+
 
 shinyApp(ui, server)
