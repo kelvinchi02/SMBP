@@ -213,7 +213,8 @@ get_live_location <- function(route_id) {
 
 # --- 6. STOP ANALYSIS ---
 
-get_ai_stop_summary <- function(stops_data, headway_changes) {
+get_ai_stop_sum
+mary <- function(stops_data, headway_changes) {
   list(
     analysis = "Stop utilization is uneven. Stop 103 is a bottleneck.",
     avg_wait_min = 12,
