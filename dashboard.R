@@ -34,6 +34,11 @@ dashboard_ui <- function(user_name = "Administrator") {
         .carousel-slide { display: none; width: 100%; height: 100%; }
         .carousel-slide.active { display: block; animation: fadeIn 0.5s ease-in-out; }
         .carousel-slide img { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Placeholder for missing images */
+        .slide-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; align-items: center; justify-content: center; flex-direction: column; color: #5f6c7b; }
+        .slide-placeholder i { font-size: 4rem; margin-bottom: 1rem; opacity: 0.5; }
+        
         .carousel-overlay { position: absolute; top: 15%; right: 5%; width: 55%; z-index: 10; pointer-events: none; }
         .feature-item { display: none; flex-direction: row-reverse; align-items: center; color: #fff; font-size: 3.5rem; font-weight: 700; padding: 10px; text-shadow: 2px 2px 8px rgba(0,0,0,0.6); text-align: right; }
         .feature-item.active { display: flex; animation: fadeInRight 0.8s ease-out; }
@@ -83,15 +88,34 @@ dashboard_ui <- function(user_name = "Administrator") {
   )
 }
 
-# Carousel Content (Home Page)
-# IMPORTANT: 'src' now points to 'index/...' which Shiny finds in the 'www' folder
+# -------------------------------------------------------------------------
+# CAROUSEL CONTENT (With Image Existence Check)
+# -------------------------------------------------------------------------
+
 dashboard_home_content <- function() {
+  
+  # Helper to check image existence
+  render_slide_image <- function(filename) {
+    # Check physical path
+    file_path <- file.path("www", "index", filename)
+    if (file.exists(file_path)) {
+      return(tags$img(src = paste0("index/", filename)))
+    } else {
+      # Fallback UI if image is missing
+      return(div(class = "slide-placeholder", 
+                 bs_icon("image", size = "3rem"), 
+                 h4("Image not found"),
+                 p(paste("Expected:", filename))
+      ))
+    }
+  }
+
   tagList(
     div(class = "carousel-container",
       div(id = "carousel",
-        div(class = "carousel-slide active", `data-slide`="1", tags$img(src = "index/1.png")), 
-        div(class = "carousel-slide", `data-slide`="2", tags$img(src = "index/2.png")),
-        div(class = "carousel-slide", `data-slide`="3", tags$img(src = "index/3.png"))
+        div(class = "carousel-slide active", `data-slide`="1", render_slide_image("1.png")), 
+        div(class = "carousel-slide", `data-slide`="2", render_slide_image("2.png")),
+        div(class = "carousel-slide", `data-slide`="3", render_slide_image("3.png"))
       ),
       div(class = "carousel-overlay",
         div(class = "carousel-features",

@@ -223,4 +223,4 @@ server <- function(input, output, session) {
   output$hour_delay_plot2 <- renderPlot({ req(global$info); hour_plot2(input$hourwhatRoute) })
 }
 
-runApp(shinyApp(ui, server), port = 6120, host = "0.0.0.0")
+shinyApp(ui, server)
