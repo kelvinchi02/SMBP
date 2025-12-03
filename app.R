@@ -38,16 +38,16 @@ source("crowd.R")
 source("ridership.R")
 source("hour.R")
 
-# Ensure image path exists
+# -------------------------------------------------------------------------
+# 2. MAIN UI SHELL
+# -------------------------------------------------------------------------
+
+# Ensure image path exists and register it
 img_folder <- "www/index"
 if (!dir.exists(img_folder)) dir.create(img_folder, recursive = TRUE)
 addResourcePath("index", img_folder)
 
-# -------------------------------------------------------------------------
-# 2. MAIN UI SHELL (Simplified)
-# -------------------------------------------------------------------------
 # We use a simple uiOutput that defaults to the Login Page. 
-# This guarantees HTML is generated immediately.
 ui <- page_fluid(
   style = "padding: 0; margin: 0;",
   
@@ -82,7 +82,6 @@ server <- function(input, output, session) {
   message("[SERVER] Client connected. Session started.")
 
   # --- 1. DATA LOADING (Lazy - Background) ---
-  # We load data here, but it doesn't block the Login UI
   global <- reactiveValues(info = NULL, routes = NULL, stops = NULL, sf_stops = NULL, loaded = FALSE)
   
   observe({
@@ -103,13 +102,11 @@ server <- function(input, output, session) {
   user_info <- reactiveVal(NULL)
   current_view <- reactiveVal("dashboard")
 
-  # THE MAIN ROUTER:
-  # If not authenticated, render Login UI. If authenticated, render Dashboard.
+  # THE MAIN ROUTER
   output$root_ui <- renderUI({
     if (!authenticated()) {
       login_ui()
     } else {
-      # Dashboard is only rendered AFTER login
       tagList(
         dashboard_ui(user_name = user_info()$name),
         chat_ui()
@@ -156,7 +153,6 @@ server <- function(input, output, session) {
   # --- 3. DASHBOARD CONTENT ---
   output$topbar_title_dynamic <- renderUI({
     req(authenticated())
-    # ... Title Logic ...
     div(class = "topbar-title", "Smart Bus Management Platform")
   })
 
@@ -174,7 +170,6 @@ server <- function(input, output, session) {
   })
 
   # --- 4. MODULE SERVER LOGIC ---
-  # IMPORTANT: All plots must use req(global$info)
   
   # CHAT
   observeEvent(input$chat_message, {
@@ -183,21 +178,9 @@ server <- function(input, output, session) {
   })
 
   # OVERVIEW PLOTS
-  output$summaryOutputPlot1 <- renderPlot({
-    req(global$info)
-    ggplot(global$info, aes(y = factor(route_id), x = occupancy_rate, color = route_id)) +
-      geom_boxplot() + theme_bw() + guides(color="none")
-  })
-  
-  output$summaryOutputPlot2 <- renderPlot({
-    req(global$info)
-    ggplot(global$info, aes(x = route_id, y = delay_min)) + geom_jitter(alpha=0.1) + theme_bw()
-  })
-  
-  output$summaryOutputPlot3 <- renderPlotly({
-    req(global$info, input$summaryplot3whatRoute)
-    create_crowding_pie(global$info, global$routes, input$summaryplot3whatRoute)
-  })
+  output$summaryOutputPlot1 <- renderPlot({ req(global$info); ggplot(global$info, aes(y = factor(route_id), x = occupancy_rate, color = route_id)) + geom_boxplot() + theme_bw() + guides(color="none") })
+  output$summaryOutputPlot2 <- renderPlot({ req(global$info); ggplot(global$info, aes(x = route_id, y = delay_min)) + geom_jitter(alpha=0.1) + theme_bw() })
+  output$summaryOutputPlot3 <- renderPlotly({ req(global$info, input$summaryplot3whatRoute); create_crowding_pie(global$info, global$routes, input$summaryplot3whatRoute) })
 
   # MAP
   output$mapPlotOut <- renderLeaflet({
@@ -205,22 +188,23 @@ server <- function(input, output, session) {
     makemap(global$sf_stops, input$whatMapalpha)
   })
   
-  # OTHER PLOTS (Weather, Crowd, Rider, Hour)
-  # Just ensure you use req(global$info) at the start of each render block
+  # OTHER PLOTS
   output$trendPlot <- renderPlot({ req(global$info); ride.plot2 })
-  output$dailyMap <- renderPlotly({ req(global$info); 
-    p <- ride.plot1(input$ride_date_select); if(is.null(p)) return(NULL); ggplotly(p) %>% hide_legend() 
-  })
+  output$dailyMap <- renderPlotly({ req(global$info); p <- ride.plot1(input$ride_date_select); if(is.null(p)) return(NULL); ggplotly(p) %>% hide_legend() })
   output$wea_hc_output <- renderHighchart({ req(global$info); create_weather_polar_chart() })
   output$wea_gg_output1 <- renderPlot({ req(global$info); create_weather_ridge_plot() })
   output$wea_gg_output2 <- renderPlot({ req(global$info); create_weather_jitter_plot() })
   output$crowd_ggplot1 <- renderPlotly({ req(global$info); create_weather_polar_chart() }) 
-  output$crowd_ggplot2 <- renderPlot({ 
-    req(global$info)
-    ggplot(global$info, aes(x = stop_id, y = N, fill = crowding_level)) + geom_col(position="fill") 
-  })
+  output$crowd_ggplot2 <- renderPlot({ req(global$info); ggplot(global$info, aes(x = stop_id, y = N, fill = crowding_level)) + geom_col(position="fill") })
   output$hour_delay_plot1 <- renderPlot({ req(global$info); hour_plot1 })
   output$hour_delay_plot2 <- renderPlot({ req(global$info); hour_plot2(input$hourwhatRoute) })
+  
+  # API Buttons
+  observeEvent(input$refresh_live_map, { showNotification("Live vehicle data refreshed (Simulation)", type="message") })
+  observeEvent(input$get_ai_insight, { 
+    data <- generate_ai_delay_summary()
+    output$ai_insight_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
+  })
 }
 
 shinyApp(ui, server)
