@@ -7,22 +7,40 @@ library(scales)
 library(lubridate)
 library(shiny)
 
+# -------------------------------------------------------------------------
+# 1. DATABASE CONNECTION
+# -------------------------------------------------------------------------
 source("database_connection.R")
 
-back_button <- actionButton("back_to_home", "← Back to Home", class = "btn-light mb-4")
-
-Sys.setlocale("LC_TIME", "en_US.UTF-8")
-
+# Load data from Supabase using your specific table name
 info <- load_supabase_table("SmartTransit_Integrated")
 
+# -------------------------------------------------------------------------
+# 2. DATA PROCESSING
+# -------------------------------------------------------------------------
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
+
+# Ensure date/time columns are correct types (Robustness check)
+if(inherits(info$scheduled_arrival, "character")) {
+  info[, scheduled_arrival := ymd_hms(scheduled_arrival)]
+}
+
+# Extract hour for analysis
 info[, hour := hour(scheduled_arrival)]
 info[, hour := factor(hour, levels = sort(unique(hour)))]
+
+# Define delay categories
 info[, delay_category := fcase(
   delay_min > 0, "Delayed",
   delay_min < 0, "Early",
   delay_min == 0, "On-time"
 )]
 
+# -------------------------------------------------------------------------
+# 3. AGGREGATES & METADATA
+# -------------------------------------------------------------------------
+
+# Create unique stops reference
 stops <- info[, .(
   lon = mean(lon),
   lat = mean(lat),
@@ -30,13 +48,20 @@ stops <- info[, .(
   delay_min = mean(delay_min)
 ), .(stop_id, route_id, route_name, route_long_name, route_color)][order(stop_id)]
 
+# Create unique routes reference
 routes <- unique(stops[, .(route_id, route_color, route_name)])
 routes <- routes[info[, .N, .(route_id, route_length_km)], on = "route_id"][, !"N"][order(route_id)]
 
+# Create spatial object (Required by map.R)
 sf_stops <- st_as_sf(stops, coords = c("lon", "lat"), crs = 4326)
+
+# -------------------------------------------------------------------------
+# 4. STYLES & UI HELPERS
+# -------------------------------------------------------------------------
 
 delay_colors <- c("Delayed" = "#E74C3C", "Early" = "#2ECC71", "On-time" = "#3498DB")
 
+# Dropdown choices generator
 choices_from_data <- routes$route_id
 names(choices_from_data) <- routes$route_name
 
@@ -44,6 +69,15 @@ styles_from_data <- sprintf("color: %s; font-weight: bold;", routes$route_color)
 
 final_choices <- c("ALL" = "ALL", choices_from_data)
 final_styles <- c("color: black; font-weight: bold;", styles_from_data)
+
+# Helper for the back button (Consolidated to one definition)
+back_button <- function() {
+  actionButton("back_to_home", "← Back to Home", class = "btn-light mb-4")
+}
+
+# -------------------------------------------------------------------------
+# 5. STATIC PLOTS (For Overview Page)
+# -------------------------------------------------------------------------
 
 summary.plot1 <- ggplot(
   info,
@@ -165,99 +199,4 @@ create_crowding_pie <- function(data, routes_info, route_idi = "ALL") {
   )
 
   return(fig)
-}
-
-create_route_map <- function(sf_stops, alpha_var = "occupancy_rate") {
-  routes <- unique(sf_stops$route_id)
-
-  m <- leaflet() %>%
-    addTiles() %>%
-    addProviderTiles(providers$CartoDB.Positron)
-
-  if (alpha_var == "occupancy_rate") {
-    min_val <- min(sf_stops$occupancy_rate)
-    max_val <- max(sf_stops$occupancy_rate)
-    size_label <- "Occupancy Rate"
-  } else {
-    min_val <- min(sf_stops$delay_min)
-    max_val <- max(sf_stops$delay_min)
-    size_label <- "Delay (minutes)"
-  }
-
-  for (route in routes) {
-    route_data <- sf_stops %>% filter(route_id == route)
-    route_color <- as.character(route_data$route_color[1])
-    route_name <- as.character(route_data$route_name[1])
-
-    route_coords <- do.call(rbind, lapply(route_data$geometry, function(x) st_coordinates(x)))
-    route_line <- st_linestring(route_coords)
-    route_sf <- st_sf(geometry = st_sfc(route_line, crs = st_crs(sf_stops)))
-
-    m <- m %>%
-      addPolylines(
-        data = route_sf,
-        color = route_color,
-        weight = 4,
-        opacity = 0.7,
-        group = route_name
-      )
-
-    m <- m %>%
-      addCircleMarkers(
-        data = route_data,
-        radius = ~ 6 + (get(alpha_var) - min_val) / (max_val - min_val) * 8,
-        stroke = TRUE,
-        color = "white",
-        weight = 1.5,
-        fillColor = route_color,
-        fillOpacity = 0.85,
-        popup = ~ paste0(
-          "<strong>Stop ID:</strong> ", stop_id, "<br>",
-          "<strong>Route:</strong> ", route_name, "<br>",
-          "<strong>Occupancy Rate:</strong> ", round(occupancy_rate * 100, 1), "%<br>",
-          "<strong>Delay:</strong> ", round(delay_min * 60, 0), " seconds"
-        ),
-        label = ~ paste0(
-          "Stop: ", stop_id, " | ",
-          "Route: ", route_name, " | ",
-          "Occupancy: ", round(occupancy_rate * 100, 1), "% | ",
-          "Delay: ", round(delay_min * 60, 0), "s"
-        ),
-        labelOptions = labelOptions(
-          style = list("font-weight" = "normal", padding = "3px 8px", "background-color" = "white"),
-          textsize = "13px",
-          direction = "auto",
-          offset = c(0, -10),
-          sticky = FALSE,
-          opacity = 0.9
-        ),
-        group = route_name
-      )
-  }
-
-  legend_html <- paste0(
-    "<div style='padding:6px; background-color:white; border-radius:4px; box-shadow:0 0 10px rgba(0,0,0,0.2);'>",
-    "<div><strong>Circle Size:</strong> ", size_label, "</div>",
-    "<div style='margin-top:5px;'><strong>Hover:</strong> Stop Details</div>",
-    "<div style='margin-top:5px;'><strong>Click:</strong> Full Information</div>",
-    "</div>"
-  )
-
-  m <- m %>%
-    addControl(html = legend_html, position = "bottomright") %>%
-    addLayersControl(
-      overlayGroups = unique(sf_stops$route_name),
-      options = layersControlOptions(collapsed = FALSE)
-    )
-
-  return(m)
-}
-
-makemap <- function(alpha_var = "occupancy_rate") {
-  create_route_map(sf_stops, alpha_var)
-}
-
-
-back_button <- function() {
-  actionButton("back_to_home", "← Back to Home", class = "btn-light mb-4")
 }

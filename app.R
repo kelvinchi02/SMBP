@@ -8,353 +8,166 @@ library(leaflet)
 library(sf)
 library(dplyr)
 library(dotenv)
+library(data.table)
+library(plotly)
+library(highcharter)
+library(ggridges)
 
+# -------------------------------------------------------------------------
+# 1. SETUP & LOADING
+# -------------------------------------------------------------------------
 
-source("pre.R")
+# Load Environment Variables (API Keys & DB Credentials)
+if (file.exists(".env")) {
+  load_dot_env(".env")
+}
+OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
+
+# Load Backend Logic
+source("database_connection.R")
+source("pre.R")         # Loads Supabase data
+source("api_utils.R")   # Loads Real-time & AI logic
+
+# Load UI Modules
+source("dashboard.R")   # NEW Sidebar & Carousel UI
+source("login.R")       # Glassmorphism Login UI
+source("chat.R")        # Chat UI
 source("overview.R")
 source("map.R")
 source("weather.R")
 source("crowd.R")
 source("ridership.R")
 source("hour.R")
-source("chat.R")
 
-if (file.exists(".env")) {
-  load_dot_env(".env")
-}
-OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
-valid_user <- Sys.getenv("LOGIN_USER")
-valid_pass <- Sys.getenv("LOGIN_PASS")
+# -------------------------------------------------------------------------
+# 2. MAIN UI SHELL
+# -------------------------------------------------------------------------
+# Add resource path for images in 'www' folder
+addResourcePath("index", "www/index") 
 
-
-nav_card <- function(id, icon_name, title, subtitle) {
-  div(
-    class = "nav-card",
-    onclick = sprintf("Shiny.setInputValue('view_selection', '%s', {priority: 'event'})", id),
-    bs_icon(icon_name, size = "2.5rem"),
-    h5(title, class = "mt-3"),
-    p(subtitle, class = "text-muted")
-  )
-}
-
-
-login_ui <- function() {
-  div(
-    class = "login-container",
-    style = "
-      background-image: url('bk.webp');
-      background-size: cover;
-      background-position: center;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      padding: 2rem;
-    ",
-
-    div(
-      class = "login-box",
-      style = "
-        background: rgba(255, 255, 255, 0.12);
-        backdrop-filter: blur(12px);
-        padding: 3rem 2.5rem;
-        border-radius: 18px;
-        width: 420px;
-        text-align: center;
-        position: relative;
-        z-index: 1;
-      ",
-
-      tags$h1("SMART", class = "login-title"),
-      tags$h1("BUS", class = "login-title", style = "margin-bottom: 1rem;"),
-
-      tags$h3(
-        "Management Platform Login",
-        style = "color: white; font-weight: 300; margin-bottom: 2rem;"
-      ),
-
-      # Username label
-      div(class = "login-label", "Username"),
-
-      # Username input wrapped to allow CSS
-      div(
-        class = "login-input",
-        textInput(
-          inputId = "login_user",
-          label = NULL,
-          value = "admin1",
-          placeholder = "Enter username"
-        )
-      ),
-
-      # Password label
-      div(class = "login-label", "Password"),
-
-      # Password input wrapped to allow CSS
-      div(
-        class = "login-input",
-        passwordInput(
-          inputId = "login_pass",
-          label = NULL,
-          placeholder = "Enter password"
-        )
-      ),
-
-      actionButton(
-        "login_btn",
-        "Login",
-        class = "btn btn-primary",
-        style = "width: 100%; margin-top: 1.2rem;"
-      ),
-
-      uiOutput("login_error")
-    )
-  )
-}
-
-
-# Home page UI
-home_ui <- function() {
-  tagList(
-    div(
-      class = "home-container",
-      
-      div(
-        class = "title-section",
-        h1("SMART BUS", class = "main-title"),
-        h2("MANAGEMENT PLATFORM", class = "sub-title"),
-        p("Select a module to explore detailed insights", class = "title-description")
-      ),
-
-      layout_column_wrap(
-        width = 1 / 3,
-        heights_equal = "row",
-        nav_card("overview", "clipboard-data-fill", "Overview", "Key system metrics"),
-        nav_card("delay", "clock-history", "Delay & Punctuality", "On-time performance analysis"),
-        nav_card("ridership", "graph-up-arrow", "Ridership Trends", "Passenger volume patterns"),
-        nav_card("crowding", "people-fill", "Crowding Analysis", "Vehicle load factors"),
-        nav_card("weather", "cloud-sun-fill", "Weather Impact", "Correlation with performance"),
-        nav_card("map", "geo-alt-fill", "Stops & Map", "Geospatial visualizations")
-      ),
-
-      div(
-        class = "about-footer",
-        h4("About This Platform", class = "about-title"),
-        div(
-          class = "about-content",
-          p("This Smart Bus Management Platform is designed for bus management teams and local transit agencies, not for everyday passengers. It helps operators see how the whole bus network is running in real time, so they can make better decisions about routes, schedules, and capacity."),
-          p("Unlike tools like Google Maps that focus on helping riders plan a single trip, our dashboard focuses on system-level operations. It shows wait times, crowding, delays, and line performance across the whole network, so agencies can quickly spot problems and respond."),
-          p("Behind the scenes, the website connects to an API that provides real-time (or simulated) bus data, including locations, occupancy, and service reliability. AI features on the dashboard can automatically summarize route performance, suggest where to add or reduce buses, and explain charts in plain language, making data easier to use for non-technical staff.")
-        )
-      )
-    )
-  )
-}
-
-# Main UI definition
 ui <- page_fluid(
-  style = "padding: 0;",
-
+  style = "padding: 0; margin: 0;",
+  
+  # Session Management Script
   tags$head(
-    tags$style(HTML("
-      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-
-      body {
-        font-family: 'Poppins', sans-serif;
-        background-color: #f8f9fa;
-      }
-
-      /* LOGIN PAGE */
-      .login-container::before {
-        content: '';
-        position: absolute;
-        top: 0; right: 0; bottom: 0; left: 0;
-        background-color: rgba(0,0,0,0.55);
-        z-index: 0;
-      }
-
-      .login-title {
-        font-size: 4rem;
-        font-weight: 800;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        background: linear-gradient(135deg, #ffffff 0%, #d0ecff 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 0 4px 25px rgba(0, 0, 0, 0.5);
-      }
-
-      .login-input {
-        background-color: rgba(255, 255, 255, 0.92);
-        color: #222 !important;
-        border: 1px solid rgba(255, 255, 255, 0.7);
-        border-radius: 10px;
-        padding: 0.9rem;
-        font-size: 1rem;
-        margin-bottom: 1rem;
-      }
-
-      .login-label {
-        color: rgba(255, 255, 255, 0.95);
-        font-weight: 600;
-        font-size: 1rem;
-        margin-bottom: 0.3rem;
-        text-align: left;
-        width: 100%;
-      }
-
-      /* HOME PAGE */
-      .home-container {
-        background-image: url('bk.webp');
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-        padding: 3rem 2rem 2rem 2rem;
-        min-height: 100vh;
-        position: relative;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-      }
-
-      .home-container::before {
-        content: '';
-        position: absolute;
-        top: 0; right: 0; bottom: 0; left: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 0;
-      }
-
-      .home-container > * { position: relative; z-index: 1; }
-
-      .title-section {
-        text-align: center;
-        margin-bottom: 3rem;
-        animation: fadeInDown 0.8s ease-out;
-      }
-
-      @keyframes fadeInDown {
-        from { opacity: 0; transform: translateY(-30px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-
-      .main-title {
-        font-size: 4rem;
-        font-weight: 800;
-        letter-spacing: 0.1em;
-        margin: 0;
-        text-transform: uppercase;
-        background: linear-gradient(135deg, #ffffff 0%, #e0f7ff 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-
-      .sub-title {
-        font-size: 1.8rem;
-        font-weight: 300;
-        color: rgba(255, 255, 255, 0.95);
-      }
-
-      .title-description {
-        font-size: 1.1rem;
-        font-weight: 400;
-        color: rgba(255, 255, 255, 0.85);
-      }
-
-      .nav-card {
-        padding: 1.5rem;
-        text-align: center;
-        border-radius: 12px;
-        background-color: rgba(255, 255, 255, 0.7);
-        cursor: pointer;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-      }
-
-      .nav-card:hover {
-        transform: translateY(-8px);
-      }
-
-      .about-footer {
-        margin-top: 4rem;
-        padding-top: 2rem;
-        text-align: center;
-      }
-
-      .about-content p:last-child { margin-bottom: 0; }
-
-      .custom-card {
-        border: 1px solid #e9ecef;
-        border-radius: 10px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-      }
-
-      .custom-card .card-header {
-        background-color: #f8f9fa;
-        border-bottom: 1px solid #e9ecef;
-      }
-
-      .footer {
-        text-align: center;
-        padding-top: 1.5rem;
-        font-size: 0.9rem;
-        color: #6c757d;
-      }
+    tags$script(HTML("
+      $(document).on('shiny:connected', function() {
+        var userInfo = localStorage.getItem('bus_user_info');
+        if (userInfo) {
+          Shiny.setInputValue('restore_session', userInfo, {priority: 'event'});
+        }
+      });
+      Shiny.addCustomMessageHandler('saveUserInfo', function(data) {
+        localStorage.setItem('bus_user_info', JSON.stringify(data));
+      });
+      Shiny.addCustomMessageHandler('clearStorage', function(data) {
+        localStorage.removeItem('bus_user_info');
+      });
     "))
   ),
-
-  uiOutput("gate")
+  
+  # Main Content Router
+  uiOutput("app_content")
 )
 
-
-
-
-# Server logic
+# -------------------------------------------------------------------------
+# 3. SERVER LOGIC
+# -------------------------------------------------------------------------
 server <- function(input, output, session) {
 
-  # ---------------- LOGIN SYSTEM ----------------
-  logged_in <- reactiveVal(FALSE)
+  # --- AUTHENTICATION STATE ---
+  authenticated <- reactiveVal(FALSE)
+  user_info <- reactiveVal(NULL)
+  current_view <- reactiveVal("dashboard")
 
-  observeEvent(input$login_btn, {
-    ok_user <- tolower(input$login_user) == tolower(valid_user)
-    ok_pass <- input$login_pass == valid_pass
+  # --- DATA STATE (Reactive Values) ---
+  realtime_data <- reactiveVal(NULL)
+  ai_insight_data <- reactiveVal(NULL)
+  ridership_data <- reactiveVal(NULL)
+  ai_ridership_data <- reactiveVal(NULL)
+  crowding_data <- reactiveVal(NULL)
+  ai_crowding_data <- reactiveVal(NULL)
+  weather_data <- reactiveVal(NULL)
+  weather_impact_data <- reactiveVal(NULL)
+  ai_weather_data <- reactiveVal(NULL)
+  live_vehicles_data <- reactiveVal(NULL)
+  ai_stop_data <- reactiveVal(NULL)
 
-    if (ok_user && ok_pass) {
-      logged_in(TRUE)
-    } else {
-      output$login_error <- renderUI({
-        div(style = "color:red; margin-top:10px;", "Invalid username or password.")
-      })
-    }
-  })
-
-  # Gate: show login page first, then app
-  output$gate <- renderUI({
-    if (!logged_in()) {
-      login_ui()
+  # --- MAIN ROUTER (Login vs Dashboard) ---
+  output$app_content <- renderUI({
+    if (!authenticated()) {
+      login_ui() # From login.R
     } else {
       tagList(
-        uiOutput("main_content"),
+        # Uses the Sidebar Layout from dashboard.R
+        dashboard_ui(user_name = user_info()$name), 
         chat_ui()
       )
     }
   })
 
- 
-  current_view <- reactiveVal("home")
+  # --- LOGIN HANDLERS ---
+  observeEvent(input$login_btn, {
+    req(input$login_user, input$login_pass)
+    
+    # Use authenticate_user from login.R (checks .env)
+    success <- authenticate_user(input$login_user, input$login_pass)
 
-  observeEvent(input$view_selection, {
-    current_view(input$view_selection)
+    if (success) {
+      authenticated(TRUE)
+      user_name_val <- input$login_user
+      user_info(list(username = input$login_user, name = user_name_val))
+      session$sendCustomMessage("saveUserInfo", list(username = input$login_user, name = user_name_val))
+    } else {
+      output$login_error <- renderUI({
+        div(style = "color:red; margin-top:10px; font-weight:bold;", "Invalid username or password.")
+      })
+    }
   })
 
-  observeEvent(input$back_to_home, {
-    current_view("home")
+  observeEvent(input$restore_session, {
+    tryCatch({
+      user_data <- jsonlite::fromJSON(input$restore_session)
+      if (!is.null(user_data$username)) {
+        authenticated(TRUE)
+        user_info(user_data)
+      }
+    }, error = function(e) { session$sendCustomMessage("clearStorage", list()) })
   })
 
-  output$main_content <- renderUI({
+  observeEvent(input$logout_btn, {
+    authenticated(FALSE)
+    user_info(NULL)
+    current_view("dashboard")
+    session$sendCustomMessage("clearStorage", list())
+  })
+
+  # --- NAVIGATION HANDLERS ---
+  # 'nav_selection' comes from the Sidebar clicks in dashboard.R
+  observeEvent(input$nav_selection, { current_view(input$nav_selection) })
+  observeEvent(input$back_to_home, { current_view("dashboard") })
+
+  # --- TOPBAR TITLE UPDATE ---
+  output$topbar_title_dynamic <- renderUI({
+    req(authenticated())
+    title_text <- switch(current_view(),
+      "dashboard" = "Smart Bus Management Platform",
+      "overview" = "Overview Dashboard",
+      "delay" = "Delay & Punctuality Analysis",
+      "ridership" = "Ridership Trends",
+      "crowding" = "Crowding Analysis",
+      "weather" = "Weather Impact",
+      "map" = "Stops & Map",
+      "Smart Bus Management Platform"
+    )
+    div(class = "topbar-title", title_text)
+  })
+
+  # --- CONTENT RENDERER ---
+  output$dashboard_content <- renderUI({
+    req(authenticated())
     switch(current_view(),
-      "home" = home_ui(),
+      "dashboard" = dashboard_home_content(), # From dashboard.R (Carousel)
       "overview" = overview_ui(),
       "delay" = delay_ui(),
       "ridership" = rider_ui(),
@@ -364,54 +177,151 @@ server <- function(input, output, session) {
     )
   })
 
-  # Chat handler
+  # --- CHATBOT LOGIC ---
   observeEvent(input$chat_message, {
-    msg <- input$chat_message$text
-    resp <- call_chatgpt(msg, OPENAI_API_KEY)
+    resp <- call_chatgpt(input$chat_message$text, OPENAI_API_KEY)
     session$sendCustomMessage("chat_response", resp)
   })
 
-  # Overview outputs
+  # =========================================================================
+  # MODULE BACKEND LOGIC (Connecting UI to api_utils.R)
+  # =========================================================================
+
+  # 1. OVERVIEW
   output$summaryOutputPlot1 <- renderPlot({ summary.plot1 })
   output$summaryOutputPlot2 <- renderPlot({ summary.plot2 })
-
   output$summaryOutputPlot3 <- renderPlotly({
-    crowding_data <- info[, .N, .(route_id, crowding_level)]
-    create_crowding_pie(crowding_data, routes, input$summaryplot3whatRoute)
+    req(input$summaryplot3whatRoute)
+    create_crowding_pie(info, routes, input$summaryplot3whatRoute)
   })
 
-  # Map outputs
+  # 2. DELAY
+  observeEvent(input$refresh_realtime, { realtime_data(get_realtime_kpis()) })
+  observe({ if(current_view() == "delay" && is.null(realtime_data())) realtime_data(get_realtime_kpis()) })
+  
+  output$realtime_kpis <- renderUI({
+    d <- realtime_data()
+    if(is.null(d)) return(NULL)
+    div(class="kpi-grid",
+        div(class="kpi-card", div(class="kpi-label", "Punctuality"), div(class="kpi-value good", paste0(d$punctuality, "%"))),
+        div(class="kpi-card", div(class="kpi-label", "Avg Delay"), div(class="kpi-value warning", paste0(d$avg_delay, " min")))
+    )
+  })
+  
+  output$worst_stops_display <- renderUI({
+    s <- get_worst_stops()
+    div(class="worst-stops", 
+      div(class="worst-stops-title", "Highest Delay Stops"),
+      lapply(1:nrow(s), function(i) {
+        div(class="stop-item", span(s[i]$stop_name), span(style="color:#E74C3C", paste0("+", round(s[i]$avg_delay, 1), " min")))
+      })
+    )
+  })
+  
+  observeEvent(input$get_ai_insight, { ai_insight_data(generate_ai_delay_summary()) })
+  output$ai_insight_display <- renderUI({
+    if(is.null(ai_insight_data())) return(NULL)
+    div(class="ai-suggestion", HTML(paste0("<strong>AI Analysis:</strong> ", ai_insight_data())))
+  })
+  
+  output$hour_delay_plot1 <- renderPlot({ hour_plot1 })
+  output$hour_delay_plot2 <- renderPlot({ hour_plot2(input$hourwhatRoute) })
+
+  # 3. RIDERSHIP
+  observeEvent(input$refresh_ridership, { ridership_data(get_ridership_kpis()) })
+  observe({ if(current_view() == "ridership" && is.null(ridership_data())) ridership_data(get_ridership_kpis()) })
+  
+  output$ridership_kpis <- renderUI({
+    d <- ridership_data()
+    if(is.null(d)) return(NULL)
+    div(class="kpi-grid",
+        div(class="kpi-card", div(class="kpi-label", "Total Pax"), div(class="kpi-value", d$total_passengers)),
+        div(class="kpi-card", div(class="kpi-label", "Status"), div(class=paste("kpi-value", d$status_class), d$status))
+    )
+  })
+  
+  observeEvent(input$get_ridership_insight, { ai_ridership_data(generate_ai_ridership_summary()) })
+  output$ai_ridership_display <- renderUI({
+    if(is.null(ai_ridership_data())) return(NULL)
+    div(class="ai-suggestion", HTML(paste0("<strong>AI Insight:</strong> ", ai_ridership_data())))
+  })
+  
+  output$trendPlot <- renderPlot({ ride.plot2 })
+  output$mapTitle <- renderText({ paste("Passengers -", input$ride_date_select) })
+  output$dailyMap <- renderPlotly({
+    p <- ride.plot1(input$ride_date_select)
+    if(is.null(p)) return(NULL)
+    ggplotly(p) |> hide_legend()
+  })
+
+  # 4. CROWDING
+  observeEvent(input$refresh_crowding, { crowding_data(get_crowding_kpis()) })
+  observe({ if(current_view() == "crowding" && is.null(crowding_data())) crowding_data(get_crowding_kpis()) })
+  
+  output$crowding_kpis <- renderUI({
+    d <- crowding_data()
+    if(is.null(d)) return(NULL)
+    div(class="kpi-grid",
+        div(class="kpi-card", div(class="kpi-label", "Avg Occupancy"), div(class="kpi-value", d$avg_occupancy)),
+        div(class="kpi-card", div(class="kpi-label", "High Risk"), div(class="kpi-value critical", d$risk_zones))
+    )
+  })
+  
+  output$crowding_breakdown_display <- renderUI({
+    d <- crowding_data()
+    if(is.null(d)) return(NULL)
+    div(class="breakdown-grid",
+        div(class="breakdown-item", div(class="breakdown-label", "Low"), div(class="breakdown-value low", d$low_count)),
+        div(class="breakdown-item", div(class="breakdown-label", "Med"), div(class="breakdown-value medium", d$med_count)),
+        div(class="breakdown-item", div(class="breakdown-label", "High"), div(class="breakdown-value high", d$high_count))
+    )
+  })
+  
+  observeEvent(input$get_crowding_insight, { ai_crowding_data(generate_ai_crowding_summary()) })
+  output$ai_crowding_display <- renderUI({
+    if(is.null(ai_crowding_data())) return(NULL)
+    div(class="ai-suggestion", HTML(paste0("<strong>AI Insight:</strong> ", ai_crowding_data())))
+  })
+  
+  output$crowd_ggplot1 <- renderPlotly({ create_weather_polar_chart() }) 
+  output$crowd_ggplot2 <- renderPlot({ 
+    ggplot(info[, .N, .(route_id, stop_id, crowding_level)], aes(x = stop_id, y = N, fill = crowding_level)) +
+      geom_col(position = "fill") + theme_minimal() + 
+      scale_fill_manual(values = c('Low'='#2ca02c', 'Medium'='#ff7f0e', 'High'='#d62728'))
+  })
+
+  # 5. WEATHER
+  observeEvent(input$refresh_weather, { weather_data(get_weather_kpis()) })
+  observe({ if(current_view() == "weather" && is.null(weather_data())) weather_data(get_weather_kpis()) })
+  
+  output$weather_current_display <- renderUI({
+    d <- weather_data()
+    if(is.null(d)) return(NULL)
+    div(class="weather-current-grid",
+        div(class="weather-kpi", div(class="weather-kpi-label", "Condition"), div(class="weather-kpi-value", d$condition)),
+        div(class="weather-kpi", div(class="weather-kpi-label", "Temp"), div(class="weather-kpi-value", d$temperature))
+    )
+  })
+  
+  observeEvent(input$get_weather_insight, { ai_weather_data(generate_ai_weather_summary()) })
+  output$ai_weather_display <- renderUI({
+    if(is.null(ai_weather_data())) return(NULL)
+    div(class="ai-suggestion", HTML(paste0("<strong>AI Insight:</strong> ", ai_weather_data())))
+  })
+  
+  output$wea_hc_output <- renderHighchart({ create_weather_polar_chart() })
+  output$wea_gg_output1 <- renderPlot({ create_weather_ridge_plot() })
+  output$wea_gg_output2 <- renderPlot({ create_weather_jitter_plot() })
+
+  # 6. MAP
+  observeEvent(input$refresh_live_map, {
+    showNotification("Live vehicle locations refreshed (Simulated)", type="message")
+  })
+  
   output$mapPlotOut <- renderLeaflet({
     makemap(input$whatMapalpha)
   })
-
-  # Weather
-  output$wea_hc_output <- renderHighchart({ table.wea })
-  output$wea_gg_output1 <- renderPlot({ plot.wea1 })
-  output$wea_gg_output2 <- renderPlot({ plot.wea2 })
-
-  # Crowding
-  output$crowd_ggplot1 <- renderPlotly({ crowd.plot2 })
-  output$crowd_ggplot2 <- renderPlot({ crowd.plot1 })
-
-  # Ridership
-  output$trendPlot <- renderPlot({ ride.plot2 })
-
-  output$mapTitle <- renderText({
-    paste("Passengers onboard -", input$ride_date_select)
-  })
-
-  output$dailyMap <- renderPlotly({
-    inter.p <- ride.plot1(input$ride_date_select)
-    ggplotly(inter.p) |> hide_legend()
-  })
-
-  # Hourly delay
-  output$hour_delay_plot1 <- renderPlot({ hour_plot1 })
-  output$hour_delay_plot2 <- renderPlot({
-    hour_plot2(input$hourwhatRoute)
-  })
 }
 
-
-shinyApp(ui, server)
+# Run the application
+runApp(shinyApp(ui, server), port = 6120, host = "0.0.0.0")

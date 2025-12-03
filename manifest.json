@@ -2669,7 +2669,7 @@
         "Maintainer": "Aron Atkins <aron@posit.co>",
         "Repository": "CRAN",
         "Date/Publication": "2025-11-18 14:20:02 UTC",
-        "Built": "R 4.4.2; ; 2025-11-22 04:37:29 UTC; windows"
+        "Built": "R 4.4.3; ; 2025-12-01 21:04:03 UTC; windows"
       }
     },
     "rstudioapi": {
@@ -3563,52 +3563,73 @@
   },
   "files": {
     ".env": {
-      "checksum": "8183811c7fc1eea59304554386e92a51"
+      "checksum": "d3ec41a8cc4c909f36f34b3bfaef55d2"
+    },
+    "api_utils.R": {
+      "checksum": "699808a15d3cb4d95be66195d4a1d7d0"
     },
     "app.R": {
-      "checksum": "5d6baac98127dd6b898adb24cbe29608"
+      "checksum": "a725f114cf35a81603d5d8e7c9100505"
     },
     "chat.R": {
-      "checksum": "b1a79fb257e098f983a3d1e0c0970a85"
+      "checksum": "e92ca5887160551b62191ac59ae02c9f"
     },
     "create_manifest.R": {
       "checksum": "55a0867e0e6f5151e06215d1972a2475"
     },
     "crowd.R": {
-      "checksum": "1b8b26b5b9c0b407b64fd534deaa6c93"
+      "checksum": "fde1c31d7c3e23caf865b19555ed409a"
+    },
+    "dashboard.R": {
+      "checksum": "fa9b336ca9d4230684d10736cc379275"
     },
     "database_connection.R": {
-      "checksum": "0b79c6d6f1bb8324e9d28f740831abea"
+      "checksum": "d37e8821eaedbf39f66af2e065dfc8a4"
     },
     "hour.R": {
-      "checksum": "70a1c6f7898b2d8ed1a0f305df154179"
+      "checksum": "416160e5a8c4ddc99e49f8be4a872694"
     },
-    "map.r": {
-      "checksum": "fff516c4f80f4636bd7a885873046a15"
+    "login.R": {
+      "checksum": "edcffb0600023718369d02560bf3faeb"
+    },
+    "map.R": {
+      "checksum": "a70861a30cf3d45b2f8cff993ff4fa95"
     },
     "overview.R": {
-      "checksum": "3ab0039b6c81efe4e52bca8365195bf6"
+      "checksum": "2cf4d2a7dfd78b38073c8e5f4568ff5d"
     },
     "pre.R": {
-      "checksum": "03b38658362cd2ef66fd05cd5e25e34a"
+      "checksum": "4749b20654d7601887a1eb15dcea2a96"
     },
     "README.md": {
       "checksum": "ae3399b2f94591dae884857ffe24a879"
     },
     "ridership.R": {
-      "checksum": "58aeaa6325f4c77ac9f94532e63f6ad2"
+      "checksum": "f7daeebefd5772c56d8622abf362023d"
+    },
+    "SmartTransit_Integrated.csv": {
+      "checksum": "bbd821c36926b8a2c93465d959d5e79c"
     },
     "styles.R": {
-      "checksum": "3c1e04c46ea8e2487b9258266835a64b"
+      "checksum": "64aadf674edad9a30e8827cb2a3d2778"
     },
     "weather.R": {
-      "checksum": "15fcb1f5a8cf4ea9ccefc6cddcf7d20a"
+      "checksum": "8b410ca4464c9cf649ad19f822ec9190"
     },
     "WWW/bk.webp": {
       "checksum": "0866909ef1e6f6639314b2b2e76c49ca"
     },
     "WWW/bk2.jpg": {
       "checksum": "b8ad430d1148504a7cb0e7edc76be07a"
+    },
+    "WWW/index/1.png": {
+      "checksum": "6195947065893b599604239813cb631d"
+    },
+    "WWW/index/2.png": {
+      "checksum": "5f5b584da85af6689f4bc92290a0b1ba"
+    },
+    "WWW/index/3.png": {
+      "checksum": "6464d8a86090252c5cd99edf91d697b2"
     }
   },
   "users": null

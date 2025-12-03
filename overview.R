@@ -2,6 +2,25 @@ source("styles.R")
 
 # Overview page UI
 overview_ui <- function() {
+  
+  # --- PRE-CALCULATIONS FOR UI ---
+  # Calculate dynamic metrics so UI updates automatically with DB changes
+  total_records <- format(nrow(info), big.mark = ",")
+  
+  # Get time range (e.g., "6 AM - 4 PM")
+  time_range <- paste(
+    format(min(info$datetime), "%I %p"), "-", 
+    format(max(info$datetime), "%I %p")
+  )
+  
+  # Get date range (e.g., "Oct 20-26, 2025")
+  date_range <- paste(
+    format(min(info$service_date), "%b %d"), "-",
+    format(max(info$service_date), "%b %d, %Y")
+  )
+  
+  # -------------------------------
+
   tagList(
     tags$head(
       tags$style(common_styles),
@@ -28,10 +47,6 @@ overview_ui <- function() {
           text-align: center;
           flex-shrink: 0;
         }
-        
-        .route-item .route-icon.route-a { color: #1f77b4; }
-        .route-item .route-icon.route-b { color: #ff7f0e; }
-        .route-item .route-icon.route-c { color: #2ca02c; }
         
         .route-item h5 {
           font-size: 1rem;
@@ -119,31 +134,46 @@ overview_ui <- function() {
           div(class = "section-title", "Route Details"),
           div(
             class = "route-grid",
+            
+            # --- DYNAMIC ROUTE GENERATION ---
+            # Using 'routes' object from pre.R to fill details
+            
+            # Route A
             div(
               class = "route-item",
-              div(class = "route-icon route-a", fa("city")),
+              div(class = "route-icon", style = paste0("color: ", routes[1, route_color]), fa("city")),
               div(
                 class = "route-details",
-                h5("Route A: Downtown Loop"),
-                p("12.3 km | 10 stops | 6 daily trips")
+                h5(paste("Route", routes[1, route_id], ":", routes[1, route_name])),
+                p(sprintf("%s km | %s stops | %s daily trips", 
+                          routes[1, route_length_km], 
+                          10, # If you have stop counts in pre.R, replace this
+                          6   # If you have trip counts in pre.R, replace this
+                ))
               )
             ),
+            
+            # Route B
             div(
               class = "route-item",
-              div(class = "route-icon route-b", fa("graduation-cap")),
+              div(class = "route-icon", style = paste0("color: ", routes[2, route_color]), fa("graduation-cap")),
               div(
                 class = "route-details",
-                h5("Route B: University Express"),
-                p("18.7 km | 10 stops | 6 daily trips")
+                h5(paste("Route", routes[2, route_id], ":", routes[2, route_name])),
+                p(sprintf("%s km | %s stops | %s daily trips", 
+                          routes[2, route_length_km], 10, 6))
               )
             ),
+            
+            # Route C
             div(
               class = "route-item",
-              div(class = "route-icon route-c", fa("plane-departure")),
+              div(class = "route-icon", style = paste0("color: ", routes[3, route_color]), fa("plane-departure")),
               div(
                 class = "route-details",
-                h5("Route C: Airport Connector"),
-                p("25.4 km | 10 stops | 6 daily trips")
+                h5(paste("Route", routes[3, route_id], ":", routes[3, route_name])),
+                p(sprintf("%s km | %s stops | %s daily trips", 
+                          routes[3, route_length_km], 10, 6))
               )
             )
           )
@@ -157,30 +187,30 @@ overview_ui <- function() {
             div(
               class = "metric-item",
               div(class = "metric-icon", bs_icon("stack")),
-              div(class = "metric-value", "2,520"),
+              div(class = "metric-value", total_records), # Dynamic
               div(class = "metric-label", "Total Records"),
               div(class = "metric-desc", "Comprehensive trip data")
             ),
             div(
               class = "metric-item",
               div(class = "metric-icon", bs_icon("clock-fill")),
-              div(class = "metric-value", "6 AM - 4 PM"),
+              div(class = "metric-value", time_range), # Dynamic
               div(class = "metric-label", "Service Hours"),
-              div(class = "metric-desc", "2-hour frequency")
+              div(class = "metric-desc", "Daily operation window")
             ),
             div(
               class = "metric-item",
               div(class = "metric-icon", bs_icon("hourglass-split")),
-              div(class = "metric-value", "1 hour"),
+              div(class = "metric-value", "1 hour"), # Keep hardcoded if constant
               div(class = "metric-label", "Trip Duration"),
-              div(class = "metric-desc", "One-way journey time")
+              div(class = "metric-desc", "Average one-way time")
             ),
             div(
               class = "metric-item",
               div(class = "metric-icon", bs_icon("calendar-week-fill")),
-              div(class = "metric-value", "7 days"),
+              div(class = "metric-value", paste(uniqueN(info$service_date), "days")), # Dynamic
               div(class = "metric-label", "Operating Period"),
-              div(class = "metric-desc", "Oct 20-26, 2025")
+              div(class = "metric-desc", date_range) # Dynamic
             )
           )
         ),
@@ -203,8 +233,8 @@ overview_ui <- function() {
               pickerInput(
                 inputId = "summaryplot3whatRoute",
                 label = "Please select a route:",
-                choices = final_choices,
-                choicesOpt = list(style = final_styles)
+                choices = final_choices, # From pre.R
+                choicesOpt = list(style = final_styles) # From pre.R
               ),
               plotlyOutput("summaryOutputPlot3", height = "450px")
             )
