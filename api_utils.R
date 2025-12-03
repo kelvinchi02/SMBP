@@ -226,5 +226,3 @@ get_ai_stop_summary <- function(stops_data = NULL, headway_changes = NULL) {
   )
 }
 
-# Alias for typo safety (optional but helpful if app.R calls it wrong)
-get_ai_stop_sum <- get_ai_stop_summary
