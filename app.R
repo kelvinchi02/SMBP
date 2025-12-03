@@ -41,9 +41,10 @@ source("ridership.R")
 source("hour.R")
 
 # Ensure image path exists and register it
-img_folder <- "www/index"
-if (!dir.exists(img_folder)) dir.create(img_folder, recursive = TRUE)
-addResourcePath("index", img_folder)
+# (Assuming you renamed the folder to 'www' lowercase as discussed)
+if (dir.exists("www/index")) {
+  addResourcePath("index", "www/index")
+}
 
 # -------------------------------------------------------------------------
 # 2. MAIN UI SHELL
@@ -83,7 +84,7 @@ server <- function(input, output, session) {
 
   # --- 1. DATA STATE ---
   # We use the GLOBAL 'info' object loaded by pre.R
-  # For real-time updates, we can store results in reactiveVals
+  # For real-time updates, we store results in reactiveVals
   realtime_delay <- reactiveVal(NULL)
   
   # --- 2. AUTHENTICATION & ROUTING ---
@@ -102,14 +103,14 @@ server <- function(input, output, session) {
     }
   })
 
-# Login Button Logic
+  # Login Logic
   observeEvent(input$login_btn, {
     req(input$login_username, input$login_password)
     
     # 1. Get the full result list
     auth_result <- authenticate_user(input$login_username, input$login_password)
     
-    # 2. Check the specific 'success' boolean inside the list
+    # 2. Check success boolean
     if (auth_result$success) {
       authenticated(TRUE)
       user_info(list(name = input$login_username))
@@ -176,45 +177,62 @@ server <- function(input, output, session) {
   output$summaryOutputPlot3 <- renderPlotly({ req(input$summaryplot3whatRoute); create_crowding_pie(info, routes, input$summaryplot3whatRoute) })
 
   # Map
-  output$mapPlotOut <- renderLeaflet({ makemap(sf_stops, input$whatMapalpha) })
+  output$mapPlotOut <- renderLeaflet({ 
+    # Use global sf_stops from pre.R, pass explicitly to fix "unused argument" error
+    makemap(sf_stops, input$whatMapalpha) 
+  })
   
   # Other Plots
   output$trendPlot <- renderPlot({ ride.plot2 })
   output$dailyMap <- renderPlotly({ p <- ride.plot1(input$ride_date_select); if(is.null(p)) return(NULL); ggplotly(p) %>% hide_legend() })
+  
   output$wea_hc_output <- renderHighchart({ create_weather_polar_chart() })
   output$wea_gg_output1 <- renderPlot({ create_weather_ridge_plot() })
   output$wea_gg_output2 <- renderPlot({ create_weather_jitter_plot() })
-  output$crowd_ggplot1 <- renderPlotly({ create_weather_polar_chart() }) 
-  output$crowd_ggplot2 <- renderPlot({ ggplot(info, aes(x = stop_id, y = N, fill = crowding_level)) + geom_col(position="fill") })
+  
+  # --- CROWDING PLOT FIX ---
+  output$crowd_ggplot1 <- renderPlotly({ create_weather_polar_chart() }) # Using polar chart as per your setup
+  
+  output$crowd_ggplot2 <- renderPlot({ 
+    # FIX: We must aggregate the data here to create the 'N' column
+    # The previous code failed because info has no 'N' column
+    plot_data <- info[, .N, .(route_id, stop_id, crowding_level)]
+    
+    ggplot(plot_data, aes(x = stop_id, y = N, fill = crowding_level)) + 
+      geom_col(position="fill") + 
+      theme_minimal() +
+      scale_fill_manual(values = c('Low'='#2ca02c', 'Medium'='#ff7f0e', 'High'='#d62728')) +
+      labs(y = "Proportion", title = "Crowding Level by Stop") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  })
+  
+  # Delay
   output$hour_delay_plot1 <- renderPlot({ hour_plot1 })
   output$hour_delay_plot2 <- renderPlot({ hour_plot2(input$hourwhatRoute) })
   
   # API Buttons
   observeEvent(input$refresh_live_map, { showNotification("Live vehicle data refreshed (Simulation)", type="message") })
+  
   observeEvent(input$get_ai_insight, { 
     data <- generate_ai_delay_summary()
     output$ai_insight_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
   })
   
-  # Map AI Button
   observeEvent(input$get_stop_insight, {
     data <- get_ai_stop_summary()
     output$ai_stop_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data$analysis))) })
   })
   
-  # Weather AI Button
   observeEvent(input$get_weather_insight, {
     data <- generate_ai_weather_summary()
     output$ai_weather_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
   })
   
-  # Crowding AI Button
   observeEvent(input$get_crowding_insight, {
     data <- generate_ai_crowding_summary()
     output$ai_crowding_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
   })
   
-  # Ridership AI Button
   observeEvent(input$get_ridership_insight, {
     data <- generate_ai_ridership_summary()
     output$ai_ridership_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })

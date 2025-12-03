@@ -152,6 +152,6 @@ create_route_map <- function(sf_stops, alpha_var = "occupancy_rate") {
   return(m)
 }
 
-makemap <- function(alpha_var = "occupancy_rate") {
-  create_route_map(sf_stops, alpha_var)
+makemap <- function(data_sf, alpha_var = "occupancy_rate") {
+  create_route_map(data_sf, alpha_var)
 }
