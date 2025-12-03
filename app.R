@@ -25,9 +25,8 @@ if (file.exists(".env")) load_dot_env(".env")
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
 # Source Modules
-# Note: pre.R runs IMMEDIATELY here. It creates 'info', 'routes', 'stops', 'sf_stops'
 source("database_connection.R")
-source("pre.R") 
+source("pre.R")
 source("api_utils.R")
 source("dashboard.R")
 source("login.R")
@@ -39,25 +38,17 @@ source("crowd.R")
 source("ridership.R")
 source("hour.R")
 
-# -------------------------------------------------------------------------
-# 2. ASSET PATH HANDLING
-# -------------------------------------------------------------------------
-# Handle the Case Sensitivity issue (WWW vs www) seen in your screenshot
-if (dir.exists("www/index")) {
-  addResourcePath("index", "www/index")
-} else if (dir.exists("WWW/index")) {
-  addResourcePath("index", "WWW/index") # Fallback for your current folder name
-} else {
-  # Safety: Create lowercase if neither exists
-  dir.create("www/index", recursive = TRUE)
-  addResourcePath("index", "www/index")
-}
+# Ensure image path exists and register it
+img_folder <- "www/index"
+if (!dir.exists(img_folder)) dir.create(img_folder, recursive = TRUE)
+addResourcePath("index", img_folder)
 
 # -------------------------------------------------------------------------
-# 3. UI
+# 2. MAIN UI SHELL
 # -------------------------------------------------------------------------
 ui <- page_fluid(
   style = "padding: 0; margin: 0;",
+  
   tags$head(
     tags$script(HTML("
       $(document).on('shiny:connected', function() {
@@ -74,19 +65,37 @@ ui <- page_fluid(
       });
     "))
   ),
+  
+  # The Root UI Router
   uiOutput("root_ui")
 )
 
-message(sprintf("[SYSTEM] UI generation complete. Startup time: %s s", round(difftime(Sys.time(), startup_start, units = "secs"), 2)))
+message(sprintf("[SYSTEM] UI generation complete. Total startup time: %s seconds", round(difftime(Sys.time(), startup_start, units = "secs"), 2)))
 
 # -------------------------------------------------------------------------
-# 4. SERVER
+# 3. SERVER LOGIC
 # -------------------------------------------------------------------------
 server <- function(input, output, session) {
   
-  message("[SERVER] Client connected.")
+  message("[SERVER] Client connected. Session started.")
 
-  # --- AUTHENTICATION ---
+  # --- 1. DATA LOADING (Lazy - Background) ---
+  global <- reactiveValues(info = NULL, routes = NULL, stops = NULL, sf_stops = NULL, loaded = FALSE)
+  
+  observe({
+    if (!global$loaded) {
+      message("[SERVER] Starting background data loading...")
+      data_objects <- load_app_data()
+      global$info <- data_objects$info
+      global$routes <- data_objects$routes
+      global$stops <- data_objects$stops
+      global$sf_stops <- data_objects$sf_stops
+      global$loaded <- TRUE
+      message("[SERVER] Background data loading complete.")
+    }
+  })
+
+  # --- 2. AUTHENTICATION & ROUTING ---
   authenticated <- reactiveVal(FALSE)
   user_info <- reactiveVal(NULL)
   current_view <- reactiveVal("dashboard")
@@ -95,23 +104,30 @@ server <- function(input, output, session) {
     if (!authenticated()) {
       login_ui()
     } else {
-      tagList(dashboard_ui(user_name = user_info()$name), chat_ui())
+      tagList(
+        dashboard_ui(user_name = user_info()$name),
+        chat_ui()
+      )
     }
   })
 
-  # Login Handlers
+  # --- LOGIN HANDLERS (FIXED INPUT IDs) ---
   observeEvent(input$login_btn, {
-    req(input$login_user, input$login_pass)
-    if (authenticate_user(input$login_user, input$login_pass)) {
+    # CRITICAL FIX: Matching IDs from login.R ('login_username', 'login_password')
+    req(input$login_username, input$login_password)
+    
+    if (authenticate_user(input$login_username, input$login_password)) {
       authenticated(TRUE)
-      user_info(list(name = input$login_user))
-      session$sendCustomMessage("saveUserInfo", list(username = input$login_user, name = input$login_user))
+      user_info(list(name = input$login_username))
+      session$sendCustomMessage("saveUserInfo", list(username = input$login_username, name = input$login_username))
     } else {
+      # Show error message
       insertUI(selector = "#login_error", where = "afterBegin",
                ui = div(style = "color:red; margin-top:10px; font-weight:bold;", "Invalid username or password."))
     }
   })
 
+  # Auto-login
   observeEvent(input$restore_session, {
     tryCatch({
       user_data <- jsonlite::fromJSON(input$restore_session)
@@ -122,6 +138,7 @@ server <- function(input, output, session) {
     }, error = function(e) { session$sendCustomMessage("clearStorage", list()) })
   })
 
+  # Logout
   observeEvent(input$logout_btn, {
     authenticated(FALSE)
     user_info(NULL)
@@ -133,6 +150,7 @@ server <- function(input, output, session) {
   observeEvent(input$nav_selection, { current_view(input$nav_selection) })
   observeEvent(input$back_to_home, { current_view("dashboard") })
 
+  # --- 3. DASHBOARD CONTENT ---
   output$topbar_title_dynamic <- renderUI({
     req(authenticated())
     div(class = "topbar-title", "Smart Bus Management Platform")
@@ -151,61 +169,41 @@ server <- function(input, output, session) {
     )
   })
 
-  # --- MODULE OUTPUTS (Using Global 'info' from pre.R) ---
+  # --- 4. MODULE SERVER LOGIC ---
   
+  # Chat
   observeEvent(input$chat_message, {
     resp <- call_chatgpt(input$chat_message$text, OPENAI_API_KEY)
     session$sendCustomMessage("chat_response", resp)
   })
 
   # Overview
-  output$summaryOutputPlot1 <- renderPlot({ ggplot(info, aes(y = factor(route_id), x = occupancy_rate, color = route_id)) + geom_boxplot() + theme_bw() + guides(color="none") })
-  output$summaryOutputPlot2 <- renderPlot({ ggplot(info, aes(x = route_id, y = delay_min)) + geom_jitter(alpha=0.1) + theme_bw() })
-  output$summaryOutputPlot3 <- renderPlotly({ req(input$summaryplot3whatRoute); create_crowding_pie(info, routes, input$summaryplot3whatRoute) })
+  output$summaryOutputPlot1 <- renderPlot({ req(global$info); ggplot(global$info, aes(y = factor(route_id), x = occupancy_rate, color = route_id)) + geom_boxplot() + theme_bw() + guides(color="none") })
+  output$summaryOutputPlot2 <- renderPlot({ req(global$info); ggplot(global$info, aes(x = route_id, y = delay_min)) + geom_jitter(alpha=0.1) + theme_bw() })
+  output$summaryOutputPlot3 <- renderPlotly({ req(global$info, input$summaryplot3whatRoute); create_crowding_pie(global$info, global$routes, input$summaryplot3whatRoute) })
 
   # Map
-  output$mapPlotOut <- renderLeaflet({ makemap(sf_stops, input$whatMapalpha) })
+  output$mapPlotOut <- renderLeaflet({
+    req(global$sf_stops)
+    makemap(global$sf_stops, input$whatMapalpha)
+  })
   
-  # Other plots
-  output$trendPlot <- renderPlot({ ride.plot2 })
-  output$dailyMap <- renderPlotly({ p <- ride.plot1(input$ride_date_select); if(is.null(p)) return(NULL); ggplotly(p) %>% hide_legend() })
-  output$wea_hc_output <- renderHighchart({ create_weather_polar_chart() })
-  output$wea_gg_output1 <- renderPlot({ create_weather_ridge_plot() })
-  output$wea_gg_output2 <- renderPlot({ create_weather_jitter_plot() })
-  output$crowd_ggplot1 <- renderPlotly({ create_weather_polar_chart() }) 
-  output$crowd_ggplot2 <- renderPlot({ ggplot(info, aes(x = stop_id, y = N, fill = crowding_level)) + geom_col(position="fill") })
-  output$hour_delay_plot1 <- renderPlot({ hour_plot1 })
-  output$hour_delay_plot2 <- renderPlot({ hour_plot2(input$hourwhatRoute) })
+  # Other Plots
+  output$trendPlot <- renderPlot({ req(global$info); ride.plot2 })
+  output$dailyMap <- renderPlotly({ req(global$info); p <- ride.plot1(input$ride_date_select); if(is.null(p)) return(NULL); ggplotly(p) %>% hide_legend() })
+  output$wea_hc_output <- renderHighchart({ req(global$info); create_weather_polar_chart() })
+  output$wea_gg_output1 <- renderPlot({ req(global$info); create_weather_ridge_plot() })
+  output$wea_gg_output2 <- renderPlot({ req(global$info); create_weather_jitter_plot() })
+  output$crowd_ggplot1 <- renderPlotly({ req(global$info); create_weather_polar_chart() }) 
+  output$crowd_ggplot2 <- renderPlot({ req(global$info); ggplot(global$info, aes(x = stop_id, y = N, fill = crowding_level)) + geom_col(position="fill") })
+  output$hour_delay_plot1 <- renderPlot({ req(global$info); hour_plot1 })
+  output$hour_delay_plot2 <- renderPlot({ req(global$info); hour_plot2(input$hourwhatRoute) })
   
-  # API Buttons (Using simulated functions)
-  # We need to render the output UI for the AI Insight text
+  # API Buttons
+  observeEvent(input$refresh_live_map, { showNotification("Live vehicle data refreshed (Simulation)", type="message") })
   observeEvent(input$get_ai_insight, { 
     data <- generate_ai_delay_summary()
     output$ai_insight_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  
-  # Map AI Button
-  observeEvent(input$get_stop_insight, {
-    data <- get_ai_stop_summary() # Corrected function name
-    output$ai_stop_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data$analysis))) })
-  })
-  
-  # Weather AI Button
-  observeEvent(input$get_weather_insight, {
-    data <- generate_ai_weather_summary()
-    output$ai_weather_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  
-  # Crowding AI Button
-  observeEvent(input$get_crowding_insight, {
-    data <- generate_ai_crowding_summary()
-    output$ai_crowding_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  
-  # Ridership AI Button
-  observeEvent(input$get_ridership_insight, {
-    data <- generate_ai_ridership_summary()
-    output$ai_ridership_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
   })
 }
 
