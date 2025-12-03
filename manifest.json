@@ -2884,6 +2884,40 @@
         "RemoteSha": "0.9.0"
       }
     },
+    "shinyjs": {
+      "Source": "CRAN",
+      "Repository": "https://cloud.r-project.org",
+      "description": {
+        "Package": "shinyjs",
+        "Title": "Easily Improve the User Experience of Your Shiny Apps in Seconds",
+        "Version": "2.1.0",
+        "Authors@R": "person(\"Dean\", \"Attali\", \n    email = \"daattali@gmail.com\",\n    role = c(\"aut\", \"cre\"),\n    comment= c(ORCID=\"0000-0002-5645-3493\"))",
+        "Description": "Perform common useful JavaScript operations in Shiny apps that will\n    greatly improve your apps without having to know any JavaScript. Examples\n    include: hiding an element, disabling an input, resetting an input back to\n    its original value, delaying code execution by a few seconds, and many more\n    useful functions for both the end user and the developer. 'shinyjs' can also\n    be used to easily call your own custom JavaScript functions from R.",
+        "URL": "https://deanattali.com/shinyjs/",
+        "BugReports": "https://github.com/daattali/shinyjs/issues",
+        "Depends": "R (>= 3.1.0)",
+        "Imports": "digest (>= 0.6.8), jsonlite, shiny (>= 1.0.0)",
+        "Suggests": "htmltools (>= 0.2.9), knitr (>= 1.7), rmarkdown, shinyAce,\nshinydisconnect, testthat (>= 0.9.1)",
+        "License": "MIT + file LICENSE",
+        "VignetteBuilder": "knitr",
+        "RoxygenNote": "7.1.1",
+        "Encoding": "UTF-8",
+        "NeedsCompilation": "no",
+        "Packaged": "2021-12-21 11:32:22 UTC; Dean-X1C",
+        "Author": "Dean Attali [aut, cre] (<https://orcid.org/0000-0002-5645-3493>)",
+        "Maintainer": "Dean Attali <daattali@gmail.com>",
+        "Repository": "CRAN",
+        "Date/Publication": "2021-12-23 10:10:02 UTC",
+        "Built": "R 4.4.3; ; 2025-12-01 21:17:07 UTC; windows",
+        "RemoteType": "standard",
+        "RemoteRef": "shinyjs",
+        "RemotePkgRef": "shinyjs",
+        "RemoteRepos": "https://cloud.r-project.org",
+        "RemoteReposName": "CRAN",
+        "RemotePkgPlatform": "x86_64-w64-mingw32",
+        "RemoteSha": "2.1.0"
+      }
+    },
     "snowflakeauth": {
       "Source": "CRAN",
       "Repository": "https://cloud.r-project.org",
@@ -3566,10 +3600,10 @@
       "checksum": "d3ec41a8cc4c909f36f34b3bfaef55d2"
     },
     "api_utils.R": {
-      "checksum": "699808a15d3cb4d95be66195d4a1d7d0"
+      "checksum": "c2cdae25b663e8072f8e6c5fe5a35c40"
     },
     "app.R": {
-      "checksum": "a725f114cf35a81603d5d8e7c9100505"
+      "checksum": "337e9c6a43c5a2cf1eebeb330baec790"
     },
     "chat.R": {
       "checksum": "e92ca5887160551b62191ac59ae02c9f"
@@ -3599,7 +3633,7 @@
       "checksum": "2cf4d2a7dfd78b38073c8e5f4568ff5d"
     },
     "pre.R": {
-      "checksum": "4749b20654d7601887a1eb15dcea2a96"
+      "checksum": "a0f19f96fbf8b620a62eb6ebf45858b4"
     },
     "README.md": {
       "checksum": "ae3399b2f94591dae884857ffe24a879"
@@ -3616,19 +3650,19 @@
     "weather.R": {
       "checksum": "8b410ca4464c9cf649ad19f822ec9190"
     },
-    "WWW/bk.webp": {
+    "www/bk.webp": {
       "checksum": "0866909ef1e6f6639314b2b2e76c49ca"
     },
-    "WWW/bk2.jpg": {
+    "www/bk2.jpg": {
       "checksum": "b8ad430d1148504a7cb0e7edc76be07a"
     },
-    "WWW/index/1.png": {
+    "www/index/1.png": {
       "checksum": "6195947065893b599604239813cb631d"
     },
-    "WWW/index/2.png": {
+    "www/index/2.png": {
       "checksum": "5f5b584da85af6689f4bc92290a0b1ba"
     },
-    "WWW/index/3.png": {
+    "www/index/3.png": {
       "checksum": "6464d8a86090252c5cd99edf91d697b2"
     }
   },
