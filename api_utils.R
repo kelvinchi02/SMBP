@@ -184,6 +184,9 @@ get_live_location <- function(route_id) {
   # Simulate live vehicles by taking random stops on the selected route
   # and adding slight jitter to lat/lon to make it look "live"
   
+  # Ensure 'stops' object exists (from pre.R)
+  if (!exists("stops")) return(list(vehicles = list()))
+  
   route_stops <- stops[route_id == route_id]
   
   # Pick 3 random stops to place buses at
