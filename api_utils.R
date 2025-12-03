@@ -213,8 +213,8 @@ get_live_location <- function(route_id) {
 
 # --- 6. STOP ANALYSIS ---
 
-get_ai_stop_sum
-mary <- function(stops_data, headway_changes) {
+get_ai_stop_summary <- function(stops_data = NULL, headway_changes = NULL) {
+  # Returns a static analysis list for the map AI button
   list(
     analysis = "Stop utilization is uneven. Stop 103 is a bottleneck.",
     avg_wait_min = 12,
@@ -225,3 +225,6 @@ mary <- function(stops_data, headway_changes) {
     route_suggestions = list("Review timing points")
   )
 }
+
+# Alias for typo safety (optional but helpful if app.R calls it wrong)
+get_ai_stop_sum <- get_ai_stop_summary
