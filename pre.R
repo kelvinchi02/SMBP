@@ -7,17 +7,30 @@ library(scales)
 library(lubridate)
 library(shiny)
 
+# Initialize System Timer
+global_start_time <- Sys.time()
+message(paste("[SYSTEM] Initialization started at:", global_start_time))
+
 # -------------------------------------------------------------------------
 # 1. DATABASE CONNECTION
 # -------------------------------------------------------------------------
 source("database_connection.R")
 
+message("[STEP 1] Initiating database connection and data retrieval...")
+t1_start <- Sys.time()
+
 # Load data from Supabase using your specific table name
 info <- load_supabase_table("SmartTransit_Integrated")
+
+t1_duration <- round(difftime(Sys.time(), t1_start, units = "secs"), 2)
+message(sprintf("[STEP 1 COMPLETED] Data retrieval successful. Rows: %d | Columns: %d. Duration: %s seconds.", nrow(info), ncol(info), t1_duration))
 
 # -------------------------------------------------------------------------
 # 2. DATA PROCESSING
 # -------------------------------------------------------------------------
+message("[STEP 2] Processing timestamps and categorical factors...")
+t2_start <- Sys.time()
+
 Sys.setlocale("LC_TIME", "en_US.UTF-8")
 
 # Ensure date/time columns are correct types (Robustness check)
@@ -36,9 +49,14 @@ info[, delay_category := fcase(
   delay_min == 0, "On-time"
 )]
 
+t2_duration <- round(difftime(Sys.time(), t2_start, units = "secs"), 2)
+message(sprintf("[STEP 2 COMPLETED] Data processing finished. Duration: %s seconds.", t2_duration))
+
 # -------------------------------------------------------------------------
 # 3. AGGREGATES & METADATA
 # -------------------------------------------------------------------------
+message("[STEP 3] Aggregating route and stop statistics...")
+t3_start <- Sys.time()
 
 # Create unique stops reference
 stops <- info[, .(
@@ -52,11 +70,23 @@ stops <- info[, .(
 routes <- unique(stops[, .(route_id, route_color, route_name)])
 routes <- routes[info[, .N, .(route_id, route_length_km)], on = "route_id"][, !"N"][order(route_id)]
 
+t3_duration <- round(difftime(Sys.time(), t3_start, units = "secs"), 2)
+message(sprintf("[STEP 3 COMPLETED] Aggregation finished. Duration: %s seconds.", t3_duration))
+
+# -------------------------------------------------------------------------
+# 4. SPATIAL CONVERSION (Performance Critical)
+# -------------------------------------------------------------------------
+message("[STEP 4] Converting coordinates to Simple Features (sf) object...")
+t4_start <- Sys.time()
+
 # Create spatial object (Required by map.R)
 sf_stops <- st_as_sf(stops, coords = c("lon", "lat"), crs = 4326)
 
+t4_duration <- round(difftime(Sys.time(), t4_start, units = "secs"), 2)
+message(sprintf("[STEP 4 COMPLETED] Spatial conversion finished. Duration: %s seconds.", t4_duration))
+
 # -------------------------------------------------------------------------
-# 4. STYLES & UI HELPERS
+# 5. STYLES & UI HELPERS
 # -------------------------------------------------------------------------
 
 delay_colors <- c("Delayed" = "#E74C3C", "Early" = "#2ECC71", "On-time" = "#3498DB")
@@ -76,8 +106,10 @@ back_button <- function() {
 }
 
 # -------------------------------------------------------------------------
-# 5. STATIC PLOTS (For Overview Page)
+# 6. STATIC PLOTS (For Overview Page)
 # -------------------------------------------------------------------------
+message("[STEP 5] Generating static visualization objects...")
+t5_start <- Sys.time()
 
 summary.plot1 <- ggplot(
   info,
@@ -156,6 +188,9 @@ summary.plot2 <- ggplot(info, aes(x = route_id, y = delay_min)) +
     axis.title = element_text(face = "bold")
   )
 
+t5_duration <- round(difftime(Sys.time(), t5_start, units = "secs"), 2)
+message(sprintf("[STEP 5 COMPLETED] Static plots generated. Duration: %s seconds.", t5_duration))
+
 create_crowding_pie <- function(data, routes_info, route_idi = "ALL") {
   crowding_colors <- c("Low" = "#2ECC71", "Medium" = "#F39C12", "High" = "#E74C3C")
 
@@ -200,3 +235,6 @@ create_crowding_pie <- function(data, routes_info, route_idi = "ALL") {
 
   return(fig)
 }
+
+total_duration <- round(difftime(Sys.time(), global_start_time, units = "secs"), 2)
+message(sprintf("[SYSTEM] Pre-processing initialization fully completed. Total time: %s seconds.", total_duration))
