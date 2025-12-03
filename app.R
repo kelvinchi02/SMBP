@@ -102,17 +102,21 @@ server <- function(input, output, session) {
     }
   })
 
-  # Login Button Logic (MATCHING IDs from login.R)
+# Login Button Logic
   observeEvent(input$login_btn, {
     req(input$login_username, input$login_password)
     
-    if (authenticate_user(input$login_username, input$login_password)) {
+    # 1. Get the full result list
+    auth_result <- authenticate_user(input$login_username, input$login_password)
+    
+    # 2. Check the specific 'success' boolean inside the list
+    if (auth_result$success) {
       authenticated(TRUE)
       user_info(list(name = input$login_username))
       session$sendCustomMessage("saveUserInfo", list(username = input$login_username, name = input$login_username))
     } else {
       insertUI(selector = "#login_error", where = "afterBegin",
-               ui = div(style = "color:red; margin-top:10px; font-weight:bold;", "Invalid username or password."))
+               ui = div(style = "color:red; margin-top:10px; font-weight:bold;", auth_result$message))
     }
   })
 
