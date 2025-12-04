@@ -2669,7 +2669,7 @@
         "Maintainer": "Aron Atkins <aron@posit.co>",
         "Repository": "CRAN",
         "Date/Publication": "2025-11-18 14:20:02 UTC",
-        "Built": "R 4.4.3; ; 2025-12-01 21:04:03 UTC; windows"
+        "Built": "R 4.4.3; ; 2025-12-03 03:27:55 UTC; windows"
       }
     },
     "rstudioapi": {
@@ -2882,40 +2882,6 @@
         "RemoteReposName": "CRAN",
         "RemotePkgPlatform": "x86_64-w64-mingw32",
         "RemoteSha": "0.9.0"
-      }
-    },
-    "shinyjs": {
-      "Source": "CRAN",
-      "Repository": "https://cloud.r-project.org",
-      "description": {
-        "Package": "shinyjs",
-        "Title": "Easily Improve the User Experience of Your Shiny Apps in Seconds",
-        "Version": "2.1.0",
-        "Authors@R": "person(\"Dean\", \"Attali\", \n    email = \"daattali@gmail.com\",\n    role = c(\"aut\", \"cre\"),\n    comment= c(ORCID=\"0000-0002-5645-3493\"))",
-        "Description": "Perform common useful JavaScript operations in Shiny apps that will\n    greatly improve your apps without having to know any JavaScript. Examples\n    include: hiding an element, disabling an input, resetting an input back to\n    its original value, delaying code execution by a few seconds, and many more\n    useful functions for both the end user and the developer. 'shinyjs' can also\n    be used to easily call your own custom JavaScript functions from R.",
-        "URL": "https://deanattali.com/shinyjs/",
-        "BugReports": "https://github.com/daattali/shinyjs/issues",
-        "Depends": "R (>= 3.1.0)",
-        "Imports": "digest (>= 0.6.8), jsonlite, shiny (>= 1.0.0)",
-        "Suggests": "htmltools (>= 0.2.9), knitr (>= 1.7), rmarkdown, shinyAce,\nshinydisconnect, testthat (>= 0.9.1)",
-        "License": "MIT + file LICENSE",
-        "VignetteBuilder": "knitr",
-        "RoxygenNote": "7.1.1",
-        "Encoding": "UTF-8",
-        "NeedsCompilation": "no",
-        "Packaged": "2021-12-21 11:32:22 UTC; Dean-X1C",
-        "Author": "Dean Attali [aut, cre] (<https://orcid.org/0000-0002-5645-3493>)",
-        "Maintainer": "Dean Attali <daattali@gmail.com>",
-        "Repository": "CRAN",
-        "Date/Publication": "2021-12-23 10:10:02 UTC",
-        "Built": "R 4.4.3; ; 2025-12-01 21:17:07 UTC; windows",
-        "RemoteType": "standard",
-        "RemoteRef": "shinyjs",
-        "RemotePkgRef": "shinyjs",
-        "RemoteRepos": "https://cloud.r-project.org",
-        "RemoteReposName": "CRAN",
-        "RemotePkgPlatform": "x86_64-w64-mingw32",
-        "RemoteSha": "2.1.0"
       }
     },
     "snowflakeauth": {
@@ -3600,10 +3566,10 @@
       "checksum": "d3ec41a8cc4c909f36f34b3bfaef55d2"
     },
     "api_utils.R": {
-      "checksum": "c2cdae25b663e8072f8e6c5fe5a35c40"
+      "checksum": "8dd96747c8985129133eac0c4485eb05"
     },
     "app.R": {
-      "checksum": "337e9c6a43c5a2cf1eebeb330baec790"
+      "checksum": "f455f657c35b458d102e0bd9a97ae026"
     },
     "chat.R": {
       "checksum": "e92ca5887160551b62191ac59ae02c9f"
@@ -3612,34 +3578,37 @@
       "checksum": "55a0867e0e6f5151e06215d1972a2475"
     },
     "crowd.R": {
-      "checksum": "fde1c31d7c3e23caf865b19555ed409a"
+      "checksum": "0465aefe36ba59dfdb3b8a5efd6b55af"
     },
     "dashboard.R": {
-      "checksum": "fa9b336ca9d4230684d10736cc379275"
+      "checksum": "d31b6a694b6301b483e39059aadfd4a1"
     },
     "database_connection.R": {
-      "checksum": "d37e8821eaedbf39f66af2e065dfc8a4"
+      "checksum": "d8ad48c73240fc6695f7efe4b3329ea1"
     },
     "hour.R": {
-      "checksum": "416160e5a8c4ddc99e49f8be4a872694"
+      "checksum": "ea2ce4826f35822bbacbecf6a18e10ac"
     },
     "login.R": {
       "checksum": "edcffb0600023718369d02560bf3faeb"
     },
     "map.R": {
-      "checksum": "a70861a30cf3d45b2f8cff993ff4fa95"
+      "checksum": "96f496c542d0ae8dc18794fe41f152a3"
     },
     "overview.R": {
-      "checksum": "2cf4d2a7dfd78b38073c8e5f4568ff5d"
+      "checksum": "7ebc34b2667196f105507f70cb2e8a1b"
     },
     "pre.R": {
-      "checksum": "a0f19f96fbf8b620a62eb6ebf45858b4"
+      "checksum": "ed84f226f0af14d41894c0ba62d5815f"
     },
     "README.md": {
       "checksum": "ae3399b2f94591dae884857ffe24a879"
     },
     "ridership.R": {
-      "checksum": "f7daeebefd5772c56d8622abf362023d"
+      "checksum": "acca48c6dab0e88f29ab838a4e2ddeec"
+    },
+    "server.R": {
+      "checksum": "9d09828b75ef0e2b8c0dee5d7ea90774"
     },
     "SmartTransit_Integrated.csv": {
       "checksum": "bbd821c36926b8a2c93465d959d5e79c"
@@ -3648,7 +3617,7 @@
       "checksum": "64aadf674edad9a30e8827cb2a3d2778"
     },
     "weather.R": {
-      "checksum": "8b410ca4464c9cf649ad19f822ec9190"
+      "checksum": "4d6d2df5647c4c61b6b53305c9e57c27"
     },
     "www/bk.webp": {
       "checksum": "0866909ef1e6f6639314b2b2e76c49ca"
