@@ -21,12 +21,13 @@ message(paste("[SYSTEM] Application startup initiated at:", startup_start))
 # 1. SETUP & MODULE LOADING
 # -------------------------------------------------------------------------
 
+# Load environment variables (critical for Supabase)
 if (file.exists(".env")) load_dot_env(".env")
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
-# Source Modules
+# Source Modules (Order is important for dependencies like 'routes' and 'info')
 source("database_connection.R")
-source("pre.R")  # Loads initial static data for immediate display
+source("pre.R")  # Loads initial static metadata (routes, stops)
 source("api_utils.R")
 source("dashboard.R")
 source("login.R")
@@ -38,7 +39,7 @@ source("crowd.R")
 source("ridership.R")
 source("hour.R")
 
-# Source the separated Server logic (where the reactive poll lives)
+# Source the separated Server logic (where the reactive poll and outputs live)
 source("server.R")
 
 # Ensure image path exists and register it
@@ -47,11 +48,14 @@ if (dir.exists("www/index")) {
 }
 
 # -------------------------------------------------------------------------
-# 2. MAIN UI SHELL
+# 2. MAIN UI SHELL (Global Definition)
 # -------------------------------------------------------------------------
+
+# This 'ui' object must be available globally for Shiny to find the application.
 ui <- page_fluid(
   style = "padding: 0; margin: 0;",
   
+  # JavaScript for session restoration (handles auto-login)
   tags$head(
     tags$script(HTML("
       $(document).on('shiny:connected', function() {
@@ -69,7 +73,7 @@ ui <- page_fluid(
     "))
   ),
   
-  # The Root UI Router
+  # The Root UI Router (will show login_ui() or dashboard_ui())
   uiOutput("root_ui")
 )
 
