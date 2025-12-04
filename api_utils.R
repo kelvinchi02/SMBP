@@ -180,25 +180,29 @@ get_ai_weather_advice <- function(current_weather, forecast_conditions, avg_dela
 
 # --- 5. MAP (LIVE VEHICLES) ---
 
-get_live_location <- function(route_id) {
-  # Simulate live vehicles by taking random stops on the selected route
-  # and adding slight jitter to lat/lon to make it look "live"
-  
-  # Ensure 'stops' object exists (from pre.R)
+get_live_location <- function(selected_route_id) {
+  # 1. Safety check: Ensure 'stops' data is loaded
   if (!exists("stops")) return(list(vehicles = list()))
   
-  route_stops <- stops[route_id == route_id]
+  # 2. Filter stops for the selected route
+  route_stops <- stops[route_id == selected_route_id]
   
-  # Pick 3 random stops to place buses at
+  # 3. Simulation Logic
+  # If we have stops, pick 3 random ones to place "buses" near
   if(nrow(route_stops) > 0) {
-    active_buses <- route_stops[sample(1:nrow(route_stops), min(3, nrow(route_stops)))]
+    idx <- sample(1:nrow(route_stops), min(3, nrow(route_stops)))
+    active_buses <- route_stops[idx]
     
     vehicles <- lapply(1:nrow(active_buses), function(i) {
       stop_data <- active_buses[i]
+      
       list(
-        vehicle_id = paste0("BUS-", route_id, "-", i),
+        vehicle_id = paste0("BUS-", selected_route_id, "-", i),
         status = sample(c("On Time", "Delayed", "Early"), 1),
         speed_kmh = sample(20:50, 1),
+        # PURE MATH, NO AI: Add random "jitter" (runif) to lat/lon
+        lat = stop_data$lat + runif(1, -0.002, 0.002), 
+        lon = stop_data$lon + runif(1, -0.002, 0.002), 
         next_stop = stop_data$stop_name,
         eta_next_stop_min = sample(1:10, 1),
         occupancy = runif(1, 0.2, 0.9)
@@ -208,7 +212,7 @@ get_live_location <- function(route_id) {
     vehicles <- list()
   }
   
-  list(vehicles = vehicles)
+  return(list(vehicles = vehicles))
 }
 
 # --- 6. STOP ANALYSIS ---
