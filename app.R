@@ -31,7 +31,7 @@ message(paste("[SYSTEM] Application startup initiated at:", startup_start))
 safe_source <- function(f) {
   message(">>> Sourcing: ", f)
   tryCatch(
-    source(f, local = TRUE),
+    source(f),
     error = function(e) {
       message(">>> ERROR in ", f, ": ", e$message)
       stop(e)
