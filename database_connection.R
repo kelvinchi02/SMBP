@@ -4,7 +4,7 @@ library(data.table)
 library(lubridate)
 
 # ------------------------------------------------------------
-# 1. Load .env only when running locally (Posit Cloud won't use this)
+# 1. Load .env only when running locally
 # ------------------------------------------------------------
 if (file.exists(".env")) {
   load_dot_env(".env")
@@ -13,12 +13,8 @@ if (file.exists(".env")) {
 supabase_url <- Sys.getenv("SUPABASE_URL")
 supabase_key <- Sys.getenv("SUPABASE_KEY")
 
-if (supabase_url == "" || supabase_key == "") {
-  stop("Missing SUPABASE_URL or SUPABASE_KEY in your environment.")
-}
-
 # ------------------------------------------------------------
-# 2. Safe conversion helper
+# 2. Safe conversion helper (remains the same)
 # ------------------------------------------------------------
 
 convert_safe <- function(col, type) {
@@ -34,7 +30,7 @@ convert_safe <- function(col, type) {
 }
 
 # ------------------------------------------------------------
-# 3. TRUE datatype mapping (from your CSV structure)
+# 3. TRUE datatype mapping (remains the same)
 # ------------------------------------------------------------
 
 type_map <- list(
@@ -56,7 +52,7 @@ type_map <- list(
   delay_min                    = "numeric",
   headway_min                  = "numeric",
   passengers_waiting           = "integer",
-  passengers_onboard           = "integer",   # 🔥 important fix
+  passengers_onboard           = "integer",   
   occupancy_rate               = "numeric",
 
   peak                         = "character",
@@ -80,67 +76,88 @@ type_map <- list(
 )
 
 # ------------------------------------------------------------
-# 4. Main Supabase fetch function
+# 4. Main Supabase fetch function (CRITICAL CHANGE)
 # ------------------------------------------------------------
 
 load_supabase_table <- function(table_name) {
-
-  endpoint <- paste0(supabase_url, "/rest/v1/", table_name, "?select=*")
-
-  req <- request(endpoint) |>
-    req_headers(
-      "apikey" = supabase_key,
-      "Authorization" = paste("Bearer", supabase_key)
+  # Perform environment check ONLY when the data is actually needed
+  if (supabase_url == "" || supabase_key == "") {
+    message("[ERROR] Supabase credentials missing. Returning empty data table.")
+    # Return an empty data table with correct columns to prevent further errors
+    empty_df <- data.table(
+        datetime=as.POSIXct(character(0)), service_date=as.Date(character(0)), 
+        route_id=character(0), delay_min=numeric(0), hour=factor(character(0), levels=NULL)
     )
-
-  resp <- req_perform(req)
-
-  raw <- resp_body_json(resp, simplifyVector = TRUE)
-
-  dt <- as.data.table(raw)
-
-  # Debug: print real column names
-  print("Columns loaded from Supabase:")
-  print(colnames(dt))
-
-  # Apply type conversion where columns match the map
-  for (col in names(type_map)) {
-    if (col %in% names(dt)) {
-      dt[[col]] <- convert_safe(dt[[col]], type_map[[col]])
+    # Add other critical columns needed for pre.R to function
+    for (col in names(type_map)) {
+        if (!col %in% names(empty_df)) {
+             empty_df[, (col) := vector(mode(type_map[[col]]), 0)]
+        }
     }
+    return(empty_df)
   }
+  
+  # API call logic inside tryCatch to handle transient network errors
+  tryCatch({
+    endpoint <- paste0(supabase_url, "/rest/v1/", table_name, "?select=*")
 
-  return(dt)
+    req <- request(endpoint) |>
+      req_headers(
+        "apikey" = supabase_key,
+        "Authorization" = paste("Bearer", supabase_key)
+      )
+
+    resp <- req_perform(req)
+
+    raw <- resp_body_json(resp, simplifyVector = TRUE)
+
+    dt <- as.data.table(raw)
+
+    # Apply type conversion where columns match the map
+    for (col in names(type_map)) {
+      if (col %in% names(dt)) {
+        dt[[col]] <- convert_safe(dt[[col]], type_map[[col]])
+      }
+    }
+
+    return(dt)
+  }, error = function(e) {
+    message(paste("[ERROR] Failed to fetch data from Supabase:", e$message))
+    return(data.table()) # Return empty table on API failure
+  })
 }
 
 
 # ------------------------------------------------------------
-# 5. Lightweight Check Function (For Auto-Refresh)
+# 5. Lightweight Check Function (CRITICAL CHANGE)
 # ------------------------------------------------------------
 
 get_latest_timestamp <- function(table_name) {
-  # We construct a query to get ONLY the most recent timestamp.
-  # Logic: Select 'datetime', Order by 'datetime' DESC, Limit to 1 row.
-  endpoint <- paste0(supabase_url, "/rest/v1/", table_name,
-                     "?select=datetime&order=datetime.desc&limit=1")
-
-  req <- request(endpoint) |>
-    req_headers(
-      "apikey" = supabase_key,
-      "Authorization" = paste("Bearer", supabase_key)
-    )
-
-  # Perform the request
-  resp <- req_perform(req)
-
-  # Parse the result
-  raw <- resp_body_json(resp, simplifyVector = TRUE)
-
-  # Safety check: If DB is empty or returns nothing, return current time to prevent errors
-  if (length(raw) == 0 || nrow(raw) == 0) {
-    return(Sys.time())
+  if (supabase_url == "" || supabase_key == "") {
+    return(Sys.time()) # Return current time so reactivePoll doesn't crash
   }
+  
+  tryCatch({
+    # Logic: Select 'datetime', Order by 'datetime' DESC, Limit to 1 row.
+    endpoint <- paste0(supabase_url, "/rest/v1/", table_name,
+                       "?select=datetime&order=datetime.desc&limit=1")
 
-  # Return the specific timestamp string
-  return(raw$datetime[1])
+    req <- request(endpoint) |>
+      req_headers(
+        "apikey" = supabase_key,
+        "Authorization" = paste("Bearer", supabase_key)
+      )
+
+    resp <- req_perform(req)
+    raw <- resp_body_json(resp, simplifyVector = TRUE)
+
+    # Return the specific timestamp string or current time on empty result
+    if (length(raw) == 0 || nrow(raw) == 0) {
+      return(Sys.time())
+    }
+    return(raw$datetime[1])
+  }, error = function(e) {
+    message(paste("[ERROR] Lightweight check failed:", e$message))
+    return(Sys.time()) # Return current time on failure
+  })
 }
