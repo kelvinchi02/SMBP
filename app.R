@@ -253,52 +253,50 @@ server <- function(input, output, session) {
   output$hour_delay_plot1 <- renderPlot({ hour_plot1 })
   output$hour_delay_plot2 <- renderPlot({ hour_plot2(input$hourwhatRoute) })
   
-  # -----------------------------------------------------------------------
-  # AI BUTTONS & API
-  # -----------------------------------------------------------------------
-# In app.R (inside server function)
 
-  observeEvent(input$refresh_live_map, { 
+# -----------------------------------------------------------------------
+  # LIVE MAP LOGIC (Automatic Update)
+  # -----------------------------------------------------------------------
   
-  # 1. Decide which route to show buses for (Defaulting to first route if none selected)
-  # You can change 'routes$route_id[1]' to input$map_route_select if you have a dropdown
-  target_route <- if(exists("routes")) routes$route_id[1] else "101"
-  
-  # 2. Call the simulation function
-  live_data <- get_live_location(target_route)
-  
-  # 3. Update the Map without reloading the page (Proxy)
-  if (length(live_data$vehicles) > 0) {
-    # Extract data from the list
-    lats <- sapply(live_data$vehicles, function(x) x$lat)
-    lons <- sapply(live_data$vehicles, function(x) x$lon)
-    ids  <- sapply(live_data$vehicles, function(x) x$vehicle_id)
-    status <- sapply(live_data$vehicles, function(x) x$status)
+  observe({
+    # 1. Listen for changes in route selection
+    req(input$map_route_select)
     
+    # 2. Get simulation data for the SPECIFIC selected route
+    target_route <- input$map_route_select
+    live_data <- get_live_location(target_route)
+    
+    # 3. Update the Map via Proxy (Efficient re-draw)
     leafletProxy("mapPlotOut") %>%
-      clearGroup("vehicles") %>% # Remove old buses
-      addCircleMarkers(
-        lng = lons,
-        lat = lats,
-        group = "vehicles",
-        radius = 10,
-        color = "white",
-        weight = 2,
-        # Color logic: Red if delayed, Green otherwise
-        fillColor = ifelse(status == "Delayed", "#E74C3C", "#2ECC71"), 
-        fillOpacity = 0.9,
-        popup = paste0(
-          "<b>Bus:</b> ", ids, "<br>",
-          "<b>Status:</b> ", status
+      clearGroup("vehicles") # Clear old buses
+    
+    if (length(live_data$vehicles) > 0) {
+      lats <- sapply(live_data$vehicles, function(x) x$lat)
+      lons <- sapply(live_data$vehicles, function(x) x$lon)
+      ids  <- sapply(live_data$vehicles, function(x) x$vehicle_id)
+      status <- sapply(live_data$vehicles, function(x) x$status)
+      
+      leafletProxy("mapPlotOut") %>%
+        addCircleMarkers(
+          lng = lons,
+          lat = lats,
+          group = "vehicles",
+          radius = 10,
+          color = "white",
+          weight = 2,
+          fillColor = ifelse(status == "Delayed", "#E74C3C", "#2ECC71"),
+          fillOpacity = 0.9,
+          popup = paste0(
+            "<b>Bus:</b> ", ids, "<br>",
+            "<b>Status:</b> ", status, "<br>",
+            "<b>Route:</b> ", target_route
+          )
         )
-      )
-    
-    showNotification(paste("Live tracking updated: Found", length(live_data$vehicles), "vehicles"), type="message")
-    
-  } else {
-    showNotification("No active vehicles found (Check if 'stops' data is loaded).", type = "warning")
-  }
-})
+    }
+  })
+
+
+
   observeEvent(input$get_ai_insight, { 
     data <- generate_ai_delay_summary()
     output$ai_insight_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })

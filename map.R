@@ -9,113 +9,51 @@ if (file.exists("api_utils.R")) {
 }
 
 # Map page UI
+# map.R
+
 map_ui <- function() {
   tagList(
     tags$head(
       tags$style(common_styles),
       tags$style(HTML("
-        /* --- Real-time Section Styles --- */
-        .realtime-section { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid #f0f0f0; }
-        .realtime-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .realtime-title { font-size: 0.75rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.12em; margin: 0; }
-        
-        /* Vehicle Cards */
-        .vehicles-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
-        .vehicle-card { background: transparent; border: 1px solid #f0f0f0; padding: 1rem; border-radius: 4px; }
-        .vehicle-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid #f0f0f0; }
-        .vehicle-id { font-size: 0.85rem; font-weight: 600; color: #2c3e50; }
-        .vehicle-status { font-size: 0.75rem; padding: 0.25rem 0.5rem; border: 1px solid #dee2e6; border-radius: 4px; }
-        .vehicle-status.on-time { color: #2ECC71; border-color: #2ECC71; background: rgba(46, 204, 113, 0.1); }
-        .vehicle-status.delayed { color: #E74C3C; border-color: #E74C3C; background: rgba(231, 76, 60, 0.1); }
-        
-        /* AI Section */
-        .ai-section { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid #f0f0f0; }
-        .ai-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
-        .ai-title { font-size: 0.75rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.12em; }
-        .btn-ai { flex: 1; padding: 0.75rem 1.2rem; background: transparent; color: #495057; border: 1px solid #dee2e6; cursor: pointer; transition: all 0.2s; }
-        .btn-ai:hover { border-color: #3498DB; color: #3498DB; }
-        .btn-refresh { background: transparent; border: 1px solid #dee2e6; color: #495057; padding: 0.5rem 1rem; font-size: 0.85rem; }
-        .btn-refresh:hover { border-color: #adb5bd; }
-        
-        .map-controls { margin-bottom: 2rem; }
-        .map-container { border-bottom: 1px solid #f0f0f0; padding-bottom: 2rem; }
+        .map-container { position: relative; height: calc(100vh - 140px); width: 100%; }
+        .map-controls {
+          position: absolute; top: 20px; right: 20px; z-index: 1000;
+          background: rgba(255, 255, 255, 0.95); padding: 15px;
+          border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+          width: 250px; backdrop-filter: blur(5px);
+        }
+        .control-label { font-size: 0.8rem; font-weight: 600; color: #6c757d; margin-bottom: 5px; }
       "))
     ),
     
     div(
       class = "page-wrapper",
+      div(class = "page-header", div(class = "container", h2("Live Network Map"), back_button())),
       
       div(
-        class = "page-header",
-        div(
-          class = "container",
-          h2("Map Dashboard"),
-          back_button()
-        )
-      ),
-      
-      div(
-        class = "page-content",
+        class = "map-container",
+        # The Map Output
+        leafletOutput("mapPlotOut", height = "100%", width = "100%"),
         
-        # 1. NEW: Real-time Vehicle Tracker
+        # Floating Controls
         div(
-          class = "page-section",
-          div(class = "realtime-section",
-            div(
-              class = "realtime-header",
-              div(class = "realtime-title", "Live Vehicle Locations"),
-              div(
-                style = "display: flex; gap: 1rem;",
-                selectInput("live_route_select", NULL, choices = c("Route A", "Route B", "Route C"), selected = "Route A", width = "150px"),
-                actionButton("refresh_live_map", "Refresh Data", class = "btn-refresh")
-              )
-            ),
-            uiOutput("vehicles_display") # Server must render this
-          )
-        ),
-        
-        # 2. NEW: AI Insight Section
-        div(
-          class = "page-section",
-          div(class = "ai-section",
-            div(
-              class = "ai-header",
-              div(class = "ai-title", "AI Stop-Level Summary"),
-              span()
-            ),
-            uiOutput("ai_stop_display"), # Server must render this
-            div(
-              class = "ai-buttons",
-              actionButton("get_stop_insight", "Generate AI Insight", class = "btn-ai")
-            )
-          )
-        ),
-        
-        # 3. EXISTING: Map Visualization
-        div(
-          class = "page-section",
-          div(class = "map-controls",
-            prettyRadioButtons(
-              inputId = "whatMapalpha",
-              label = "Size Circles By:",
-              choices = c("Occupancy Rate" = "occupancy_rate", "Delay Minutes" = "delay_min"),
-              icon = icon("check"),
-              bigger = TRUE,
-              status = "info",
-              animation = "jelly",
-              inline = TRUE
-            )
+          class = "map-controls",
+          
+          # 1. Route Selector (Triggers update automatically)
+          div(class = "control-label", "SELECT ROUTE"),
+          pickerInput(
+            inputId = "map_route_select",
+            label = NULL,
+            choices = if(exists("routes")) routes$route_id else c("Loading..."),
+            options = list(size = 5),
+            width = "100%"
           ),
-          div(
-            class = "map-container",
-            leafletOutput("mapPlotOut", height = 750)
-          )
+          
+          # 2. Layer Transparency
+          div(class = "control-label", "STOP VISIBILITY"),
+          sliderInput("whatMapalpha", NULL, min = 0, max = 1, value = 0.7, step = 0.1, ticks = FALSE)
         )
-      ),
-      
-      div(
-        class = "page-footer",
-        div(class = "container", p("SmartTransit Analytics Dashboard © 2025"))
       )
     )
   )
