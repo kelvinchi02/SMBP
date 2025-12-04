@@ -106,100 +106,40 @@ back_button <- function() {
 }
 
 # -------------------------------------------------------------------------
-# 6. STATIC PLOTS (For Overview Page)
+# 6. STATIC PLOTS (Only keeping function definitions if needed)
 # -------------------------------------------------------------------------
-message("[STEP 5] Generating static visualization objects...")
-t5_start <- Sys.time()
-
-summary.plot1 <- ggplot(
-  info,
-  aes(y = factor(route_id, levels = routes$route_id), x = occupancy_rate, color = route_id)
-) +
-  geom_boxplot(
-    aes(fill = after_scale(alpha(color, 0.3))),
-    outlier.shape = 21,
-    outlier.size = 2,
-    outlier.alpha = 0.7,
-    width = 0.6
-  ) +
-  scale_color_manual(
-    values = setNames(routes[, route_color], routes[, route_id]),
-    labels = setNames(routes[, route_name], routes[, route_id]),
-    name = "Transit Route"
-  ) +
-  scale_x_continuous(
-    name = "Occupancy Rate",
-    labels = percent_format(),
-    limits = function(x) c(max(0, min(x) - 0.05), min(1, max(x) + 0.05))
-  ) +
-  scale_y_discrete(
-    name = "Route",
-    labels = sprintf("%s", routes$route_id)
-  ) +
-  geom_vline(xintercept = 1, linetype = "dashed", color = "red", alpha = 0.5) +
-  labs(
-    title = "Occupancy Rate Distribution by Transit Route",
-    subtitle = "Comparing passenger load across different routes",
-    caption = "Dashed red line indicates 100% capacity"
-  ) +
-  theme_bw() +
-  theme(
-    legend.position = "none",
-    panel.grid.minor = element_blank(),
-    panel.grid.major.y = element_blank(),
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5),
-    axis.title = element_text(face = "bold")
-  )
-
-summary.plot2 <- ggplot(info, aes(x = route_id, y = delay_min)) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-  geom_point(
-    aes(color = delay_category),
-    position = position_jitter(width = 0.2, height = 0),
-    alpha = 0.4,
-    size = 2
-  ) +
-  stat_summary(
-    fun = mean,
-    fun.min = function(x) mean(x) - sd(x),
-    fun.max = function(x) mean(x) + sd(x),
-    geom = "pointrange",
-    size = 0.8,
-    color = "black"
-  ) +
-  scale_color_manual(values = delay_colors, name = "Delay Status") +
-  scale_x_discrete(
-    name = "Transit Route",
-    labels = setNames(sprintf("%s", routes$route_name), routes$route_id)
-  ) +
-  labs(
-    title = "Transit Delays of Routes",
-    subtitle = "Distribution of delays across different routes\nwith mean values (black dots) and standard deviation (error bars)",
-    y = "Delay (minutes)",
-    caption = "Negative values indicate early arrivals, positive values indicate delays"
-  ) +
-  theme_bw() +
-  theme(
-    panel.grid.minor = element_blank(),
-    legend.position = "top",
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5),
-    axis.title = element_text(face = "bold")
-  )
-
-t5_duration <- round(difftime(Sys.time(), t5_start, units = "secs"), 2)
-message(sprintf("[STEP 5 COMPLETED] Static plots generated. Duration: %s seconds.", t5_duration))
+# NOTE: Removed static plot objects (summary.plot1, summary.plot2) as they 
+# are now generated dynamically in the server.
+message("[STEP 5] Skipped static plot generation (Now handled dynamically).")
 
 create_crowding_pie <- function(data, routes_info, route_idi = "ALL") {
   crowding_colors <- c("Low" = "#2ECC71", "Medium" = "#F39C12", "High" = "#E74C3C")
 
   if (route_idi == "ALL") {
-    plot_data <- data[, .(N = sum(N)), by = crowding_level]
+    # If using 'info' which is defined globally here, we must re-create N/crowding_level
+    if (!"crowding_level" %in% names(data)) {
+      data[, crowding_level := data.table::fcase(
+        occupancy_rate < 0.5, "Low",
+        occupancy_rate < 0.85, "Medium",
+        default = "High"
+      )]
+    }
+    plot_data <- data[, .(N = .N), by = crowding_level]
     main_title <- "All Routes Combined"
     title_color <- "#333333"
   } else {
     plot_data <- data[route_id == route_idi]
+    
+    if (!"crowding_level" %in% names(plot_data)) {
+      plot_data[, crowding_level := data.table::fcase(
+        occupancy_rate < 0.5, "Low",
+        occupancy_rate < 0.85, "Medium",
+        default = "High"
+      )]
+    }
+    
+    plot_data <- plot_data[, .(N = .N), by = crowding_level]
+    
     route_index <- which(routes_info$route_id == route_idi)
     route_name <- routes_info$route_name[route_index]
     route_length <- routes_info$route_length_km[route_index]

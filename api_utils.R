@@ -5,19 +5,27 @@ library(scales)
 # -------------------------------------------------------------------------
 # API UTILITIES (Simulation Mode)
 # -------------------------------------------------------------------------
-# Since we cannot run a separate API server on Posit Cloud (port 5005),
-# these functions simulate API responses by calculating metrics 
-# directly from your Supabase data ('info' object).
+# Refactored to accept 'data' dynamically for auto-refresh compatibility.
 # -------------------------------------------------------------------------
 
 # --- 1. DELAY & PUNCTUALITY ---
 
-get_realtime_kpis <- function() {
-  # Calculate metrics from the full dataset to simulate "current status"
-  total_trips <- nrow(info)
-  on_time <- nrow(info[delay_category == "On-time"])
-  avg_delay_val <- mean(info[delay_min > 0]$delay_min, na.rm = TRUE)
-  active_issues <- nrow(info[delay_min > 5]) # Arbitrary threshold for "issue"
+get_realtime_kpis <- function(data) {
+  # Calculate metrics from the live dataset
+  if (is.null(data) || nrow(data) == 0) return(list(punctuality=0, avg_delay=0, active_issues=0))
+  
+  total_trips <- nrow(data)
+  on_time <- nrow(data[delay_category == "On-time"])
+  
+  # Protect against NaN if no delayed trips exist
+  delayed_trips <- data[delay_min > 0]
+  if (nrow(delayed_trips) > 0) {
+    avg_delay_val <- mean(delayed_trips$delay_min, na.rm = TRUE)
+  } else {
+    avg_delay_val <- 0
+  }
+  
+  active_issues <- nrow(data[delay_min > 5]) # Arbitrary threshold for "issue"
   
   list(
     punctuality = round((on_time / total_trips) * 100, 1),
@@ -26,9 +34,11 @@ get_realtime_kpis <- function() {
   )
 }
 
-get_worst_stops <- function() {
+get_worst_stops <- function(data) {
+  if (is.null(data) || nrow(data) == 0) return(NULL)
+  
   # Aggregate delays by stop
-  worst <- info[, .(avg_delay = mean(delay_min, na.rm=TRUE)), by = .(stop_name, stop_id)]
+  worst <- data[, .(avg_delay = mean(delay_min, na.rm=TRUE)), by = .(stop_name, stop_id)]
   worst <- worst[order(-avg_delay)]
   head(worst, 5) # Return top 5
 }
@@ -40,9 +50,11 @@ generate_ai_delay_summary <- function() {
 
 # --- 2. RIDERSHIP ---
 
-get_ridership_kpis <- function() {
-  total_pax <- sum(info$passengers_onboard, na.rm = TRUE)
-  avg_occ <- mean(info$occupancy_rate, na.rm = TRUE)
+get_ridership_kpis <- function(data) {
+  if (is.null(data) || nrow(data) == 0) return(list(total_passengers="0", avg_occupancy="0%", status="Unknown", status_class="normal"))
+
+  total_pax <- sum(data$passengers_onboard, na.rm = TRUE)
+  avg_occ <- mean(data$occupancy_rate, na.rm = TRUE)
   
   # Determine status text
   status <- fcase(
@@ -87,18 +99,27 @@ add_ridership_trip <- function(route_id, current_headway, current_ridership, ext
 
 # --- 3. CROWDING ---
 
-get_crowding_kpis <- function() {
-  avg_occ <- mean(info$occupancy_rate, na.rm = TRUE)
-  risk_zones <- nrow(info[occupancy_rate > 0.85])
+get_crowding_kpis <- function(data) {
+  if (is.null(data) || nrow(data) == 0) return(list(avg_occupancy="0%", risk_zones=0, low_count=0, med_count=0, high_count=0))
+
+  avg_occ <- mean(data$occupancy_rate, na.rm = TRUE)
+  risk_zones <- nrow(data[occupancy_rate > 0.85])
   
-  breakdown <- info[, .N, by = crowding_level]
+  # Ensure all levels exist in aggregation to avoid errors if one level is missing
+  breakdown <- data[, .N, by = crowding_level]
+  
+  # Safe extraction helper
+  get_count <- function(lvl) {
+    val <- breakdown[crowding_level == lvl, N]
+    if(length(val) == 0) return(0) else return(val)
+  }
   
   list(
     avg_occupancy = percent(avg_occ, accuracy = 1),
     risk_zones = risk_zones,
-    low_count = breakdown[crowding_level == "Low", N],
-    med_count = breakdown[crowding_level == "Medium", N],
-    high_count = breakdown[crowding_level == "High", N]
+    low_count = get_count("Low"),
+    med_count = get_count("Medium"),
+    high_count = get_count("High")
   )
 }
 
@@ -122,9 +143,17 @@ add_crowding_trip <- function(route_id, current_headway, avg_occupancy, extra_tr
 
 # --- 4. WEATHER ---
 
-get_current_weather <- function() {
+get_current_weather <- function(data) {
+  if (is.null(data) || nrow(data) == 0) {
+    # Fallback if no data
+    return(list(
+      current = list(condition = "Unknown", temperature = 0, humidity = 0, wind_speed = 0),
+      forecast = list()
+    ))
+  }
+
   # Simulate current weather based on the last row of data
-  latest <- tail(info, 1)
+  latest <- tail(data, 1)
   
   list(
     current = list(
@@ -142,7 +171,7 @@ get_current_weather <- function() {
 }
 
 get_weather_impact <- function(hour) {
-  # Return dummy data for the impact chart
+  # Return dummy data for the impact chart (Static simulation)
   list(
     impacts = data.frame(
       condition = c("Clear", "Cloudy", "Rain"),
@@ -153,9 +182,9 @@ get_weather_impact <- function(hour) {
   )
 }
 
-get_weather_kpis <- function() {
+get_weather_kpis <- function(data) {
   # Wrapper for get_current_weather to match app.R expectations
-  w <- get_current_weather()
+  w <- get_current_weather(data)
   list(
     condition = w$current$condition,
     temperature = paste0(w$current$temperature, "°C")
@@ -180,12 +209,12 @@ get_ai_weather_advice <- function(current_weather, forecast_conditions, avg_dela
 
 # --- 5. MAP (LIVE VEHICLES) ---
 
-get_live_location <- function(selected_route_id) {
-  # 1. Safety check: Ensure 'stops' data is loaded
-  if (!exists("stops")) return(list(vehicles = list()))
+get_live_location <- function(stops_data, selected_route_id) {
+  # 1. Safety check
+  if (is.null(stops_data) || nrow(stops_data) == 0) return(list(vehicles = list()))
   
   # 2. Filter stops for the selected route
-  route_stops <- stops[route_id == selected_route_id]
+  route_stops <- stops_data[route_id == selected_route_id]
   
   # 3. Simulation Logic
   # If we have stops, pick 3 random ones to place "buses" near
@@ -229,4 +258,3 @@ get_ai_stop_summary <- function(stops_data = NULL, headway_changes = NULL) {
     route_suggestions = list("Review timing points")
   )
 }
-

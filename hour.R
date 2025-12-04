@@ -144,40 +144,48 @@ delay_ui <- function() {
 # VISUALIZATION LOGIC
 # -------------------------------------------------------------------------
 
-# Pre-calculate data for the Schedule Adherence Plot
-# We use 'info' from pre.R
-hour.data <- info[delay_category != 'On-time', mean(delay_min), .(delay_category, route_id, hour)]
-hour_plot_data <- merge(hour.data, routes, by = "route_id")
-
-hour_plot1 <- ggplot(hour_plot_data, aes(x = V1, y = route_name, color = delay_category)) +
-  geom_vline(xintercept = 0, color = "grey60", linetype = "dashed") +
-  geom_segment(aes(x = 0, xend = V1, y = route_name, yend = route_name), size = 1.2) +
-  geom_point(size = 4) +
-  geom_text(aes(label = round(V1, 2), hjust = ifelse(V1 > 0, -0.4, 1.4)), size = 3, fontface = "bold", show.legend = FALSE) +
-  facet_wrap(vars(hour), ncol = 1, scales = "free_y") +
-  scale_color_manual(values = c("Delayed" = "#E74C3C", "Early" = "#2ECC71")) +
-  scale_x_continuous(limits = c(-1.2, 1.2), breaks = seq(-1, 1, 0.5)) +
-  labs(
-    title = "Hourly Schedule Adherence",
-    subtitle = "Deviation in minutes by Route and Hour",
-    x = "Minutes (Negative = Early, Positive = Delayed)",
-    y = NULL,
-    color = "Status"
-  ) +
-  theme_bw(base_size = 14) +
-  theme(
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor = element_blank(),
-    strip.background = element_rect(fill = "#f8f9fa", color = "grey80"),
-    strip.text = element_text(face = "bold"),
-    legend.position = "top"
-  )
-
-hour_plot2 <- function(whatRoutine) {
-  # Safety check: if user selects nothing, default to first route
-  if (is.null(whatRoutine)) whatRoutine <- routes$route_id[1]
+# FUNCTION 1: Hourly Schedule Adherence
+# Now accepts 'data' (live observations) and 'routes_ref' (static route metadata)
+create_hour_plot1 <- function(data, routes_ref) {
   
-  ggplot(info[route_id == whatRoutine], aes(x = hour, y = delay_min)) +
+  # Recalculate aggregation on live data
+  hour.data <- data[delay_category != 'On-time', mean(delay_min), .(delay_category, route_id, hour)]
+  
+  # Merge with route metadata for names and colors
+  hour_plot_data <- merge(hour.data, routes_ref, by = "route_id")
+
+  ggplot(hour_plot_data, aes(x = V1, y = route_name, color = delay_category)) +
+    geom_vline(xintercept = 0, color = "grey60", linetype = "dashed") +
+    geom_segment(aes(x = 0, xend = V1, y = route_name, yend = route_name), size = 1.2) +
+    geom_point(size = 4) +
+    geom_text(aes(label = round(V1, 2), hjust = ifelse(V1 > 0, -0.4, 1.4)), size = 3, fontface = "bold", show.legend = FALSE) +
+    facet_wrap(vars(hour), ncol = 1, scales = "free_y") +
+    scale_color_manual(values = c("Delayed" = "#E74C3C", "Early" = "#2ECC71")) +
+    scale_x_continuous(limits = c(-1.2, 1.2), breaks = seq(-1, 1, 0.5)) +
+    labs(
+      title = "Hourly Schedule Adherence",
+      subtitle = "Deviation in minutes by Route and Hour",
+      x = "Minutes (Negative = Early, Positive = Delayed)",
+      y = NULL,
+      color = "Status"
+    ) +
+    theme_bw(base_size = 14) +
+    theme(
+      panel.grid.major.y = element_blank(),
+      panel.grid.minor = element_blank(),
+      strip.background = element_rect(fill = "#f8f9fa", color = "grey80"),
+      strip.text = element_text(face = "bold"),
+      legend.position = "top"
+    )
+}
+
+# FUNCTION 2: Distribution of Delays
+# Now accepts 'data' (live) and 'whatRoutine' (input selection)
+create_hour_plot2 <- function(data, whatRoutine) {
+  # Safety check: if user selects nothing, default to first route available in data
+  if (is.null(whatRoutine)) whatRoutine <- unique(data$route_id)[1]
+  
+  ggplot(data[route_id == whatRoutine], aes(x = hour, y = delay_min)) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
     geom_point(aes(color = delay_category), position = position_jitter(width = 0.2, height = 0), alpha = 0.4, size = 2) +
     scale_color_manual(values = delay_colors, name = "Delay Status") +

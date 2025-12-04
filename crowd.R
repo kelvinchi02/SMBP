@@ -142,49 +142,53 @@ crowd_ui <- function() {
 # VISUALIZATION LOGIC
 # -------------------------------------------------------------------------
 
-# Plot 1: Stacked Bar Chart for Crowding Levels
-crowd.plot2 <- ggplot(
-    # Recalculate data inside function/render call to ensure freshness
-    info[, .N, .(route_id, stop_id, crowding_level)][order(stop_id)], 
-    aes(x = stop_id, y = N, fill = crowding_level)
-  ) +
-  geom_col(position = "fill", width = 0.8) +
-  scale_fill_manual(values = c('Low' = '#2ca02c', 'Medium' = '#ff7f0e', 'High' = '#d62728')) +
-  scale_y_continuous(labels = percent_format(accuracy = 1)) +
-  facet_wrap(vars(route_id), scales = "free_x") +
-  theme_minimal() +
-  labs(x = "Stop ID", y = "Proportion", fill = "Crowding Level", title = "Crowding Level Proportions by Stop and Route") +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "top",
-    strip.text = element_text(size = 12, face = "bold")
-  )
+# FUNCTION 1: Stacked Bar Chart for Crowding Levels
+create_crowd_bar <- function(data) {
+  
+  # Calculate aggregation dynamically from live data
+  plot_data <- data[, .N, .(route_id, stop_id, crowding_level)][order(stop_id)]
+  
+  ggplot(plot_data, aes(x = stop_id, y = N, fill = crowding_level)) +
+    geom_col(position = "fill", width = 0.8) +
+    scale_fill_manual(values = c('Low' = '#2ca02c', 'Medium' = '#ff7f0e', 'High' = '#d62728')) +
+    scale_y_continuous(labels = percent_format(accuracy = 1)) +
+    facet_wrap(vars(route_id), scales = "free_x") +
+    theme_minimal() +
+    labs(x = "Stop ID", y = "Proportion", fill = "Crowding Level", title = "Crowding Level Proportions by Stop and Route") +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "top",
+      strip.text = element_text(size = 12, face = "bold")
+    )
+}
 
-# Plot 2: Scatter Map for Occupancy
-# Note: Renamed from crowd.plot2 to crowd.plot1 in UI (or vice versa), 
-# kept logic consistent here but be careful with naming in app.R
-redata <- info[, .(lon, lat, occupancy_rate, trip_id)]
-redata[, hover_info := paste0(
-  "<b>Trip ID:</b> ", trip_id, "<br>",
-  "<b>Occupancy:</b> ", scales::percent(occupancy_rate, accuracy = 0.1)
-)]
+# FUNCTION 2: Scatter Map for Occupancy
+create_crowd_map <- function(data) {
+  
+  # Prepare live data for the map
+  redata <- data[, .(lon, lat, occupancy_rate, trip_id)]
+  redata[, hover_info := paste0(
+    "<b>Trip ID:</b> ", trip_id, "<br>",
+    "<b>Occupancy:</b> ", scales::percent(occupancy_rate, accuracy = 0.1)
+  )]
 
-crowd.plot1 <- plot_ly(
-  data = redata,
-  x = ~lon,
-  y = ~lat,
-  type = 'scatter',
-  mode = 'markers',
-  color = ~occupancy_rate,
-  colors = "YlOrRd", 
-  text = ~hover_info,
-  hovertemplate = "%{text}<extra></extra>",
-  marker = list(size = 12, line = list(color = '#333333', width = 1), opacity = 0.9)
-) %>%
-  layout(
-    title = list(text = "<b>Trip Locations & Occupancy Rates</b>"),
-    xaxis = list(title = "Longitude", zeroline = FALSE),
-    yaxis = list(title = "Latitude", zeroline = FALSE, scaleanchor = "x", scaleratio = 1),
-    legend = list(title = list(text = "Occupancy"))
+  plot_ly(
+    data = redata,
+    x = ~lon,
+    y = ~lat,
+    type = 'scatter',
+    mode = 'markers',
+    color = ~occupancy_rate,
+    colors = "YlOrRd", 
+    text = ~hover_info,
+    hovertemplate = "%{text}<extra></extra>",
+    marker = list(size = 12, line = list(color = '#333333', width = 1), opacity = 0.9)
   ) %>%
-  colorbar(title = "Rate", tickformat = ".0%")
+    layout(
+      title = list(text = "<b>Trip Locations & Occupancy Rates</b>"),
+      xaxis = list(title = "Longitude", zeroline = FALSE),
+      yaxis = list(title = "Latitude", zeroline = FALSE, scaleanchor = "x", scaleratio = 1),
+      legend = list(title = list(text = "Occupancy"))
+    ) %>%
+    colorbar(title = "Rate", tickformat = ".0%")
+}

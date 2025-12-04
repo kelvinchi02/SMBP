@@ -112,3 +112,35 @@ load_supabase_table <- function(table_name) {
 
   return(dt)
 }
+
+
+# ------------------------------------------------------------
+# 5. Lightweight Check Function (For Auto-Refresh)
+# ------------------------------------------------------------
+
+get_latest_timestamp <- function(table_name) {
+  # We construct a query to get ONLY the most recent timestamp.
+  # Logic: Select 'datetime', Order by 'datetime' DESC, Limit to 1 row.
+  endpoint <- paste0(supabase_url, "/rest/v1/", table_name,
+                     "?select=datetime&order=datetime.desc&limit=1")
+
+  req <- request(endpoint) |>
+    req_headers(
+      "apikey" = supabase_key,
+      "Authorization" = paste("Bearer", supabase_key)
+    )
+
+  # Perform the request
+  resp <- req_perform(req)
+
+  # Parse the result
+  raw <- resp_body_json(resp, simplifyVector = TRUE)
+
+  # Safety check: If DB is empty or returns nothing, return current time to prevent errors
+  if (length(raw) == 0 || nrow(raw) == 0) {
+    return(Sys.time())
+  }
+
+  # Return the specific timestamp string
+  return(raw$datetime[1])
+}

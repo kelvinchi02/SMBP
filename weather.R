@@ -146,8 +146,9 @@ weather_ui <- function() {
 # -------------------------------------------------------------------------
 
 # 1. Polar Column Chart (Highchart)
-create_weather_polar_chart <- function() {
-  wea.table <- info[, .(mean(delay_min)), .(weather_hourly_conditions, delay_category)] |> 
+create_weather_polar_chart <- function(data) {
+  # RECALCULATE ON LIVE DATA
+  wea.table <- data[, .(mean(delay_min)), .(weather_hourly_conditions, delay_category)] |> 
     dcast(weather_hourly_conditions ~ delay_category, value.var = 'V1')
   
   if ("On-time" %in% names(wea.table)) wea.table <- wea.table[, !'On-time']
@@ -171,8 +172,8 @@ create_weather_polar_chart <- function() {
 }
 
 # 2. Density Ridges (ggplot)
-create_weather_ridge_plot <- function() {
-  ggplot(info[delay_min != 0], aes(x = delay_min, y = weather_hourly_conditions, fill = delay_category)) +
+create_weather_ridge_plot <- function(data) {
+  ggplot(data[delay_min != 0], aes(x = delay_min, y = weather_hourly_conditions, fill = delay_category)) +
     geom_density_ridges(alpha = 0.7, color = "white") +
     geom_vline(xintercept = 0, linetype = "dashed", color = "gray30") +
     scale_fill_manual(values = c("Delayed" = "#E74C3C", "Early" = "#2ECC71"), name = "Delay Status") +
@@ -182,11 +183,11 @@ create_weather_ridge_plot <- function() {
 }
 
 # 3. Jitter Plot (ggplot)
-create_weather_jitter_plot <- function() {
-  ggplot(info, aes(x = weather_hourly_conditions, y = delay_min)) +
+create_weather_jitter_plot <- function(data) {
+  ggplot(data, aes(x = weather_hourly_conditions, y = delay_min)) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
     geom_point(aes(color = delay_category), position = position_jitter(width = 0.2, height = 0), alpha = 0.4, size = 2) +
-    scale_color_manual(values = delay_colors, name = "Delay Status") +
+    scale_color_manual(values = c("Delayed" = "#E74C3C", "Early" = "#2ECC71", "On-time" = "#3498DB"), name = "Delay Status") +
     labs(title = "Impact of Weather on Delays", x = "Weather Condition", y = "Delay (minutes)") +
     theme_bw() + theme(legend.position = "top")
 }

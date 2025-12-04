@@ -2,17 +2,6 @@ source("styles.R")
 source("api_utils.R")
 
 # -------------------------------------------------------------------------
-# DATA PREPARATION (Must run before UI)
-# -------------------------------------------------------------------------
-
-# Aggregated data for the Trend Plot (Bar Chart)
-ride.data <- info[, .(sum(passengers_onboard)), .(route_id, service_date)]
-setnames(ride.data, "V1", "total_passengers") # Clean column name
-
-# Choices for the Dropdown
-date_choices <- sort(unique(ride.data$service_date))
-
-# -------------------------------------------------------------------------
 # UI DEFINITION
 # -------------------------------------------------------------------------
 
@@ -100,7 +89,7 @@ rider_ui <- function() {
               div(class = "realtime-title", "Real-time Ridership Metrics"),
               actionButton("refresh_ridership", "Refresh Data", class = "btn-refresh")
             ),
-            uiOutput("ridership_kpis") # Server must render this
+            uiOutput("ridership_kpis")
           )
         ),
         
@@ -113,7 +102,7 @@ rider_ui <- function() {
               div(class = "ai-title", "AI Demand & Extra-Trip Recommendation"),
               span()
             ),
-            uiOutput("ai_ridership_display"), # Server must render this
+            uiOutput("ai_ridership_display"),
             div(
               class = "ai-buttons",
               actionButton("get_ridership_insight", "Generate AI Insight", class = "btn-ai"),
@@ -134,11 +123,14 @@ rider_ui <- function() {
         div(
           class = "page-section",
           div(class = "ridership-controls",
+            # Note: We keep the input static for now as updating choices dynamically requires more server logic.
+            # It will show dates available at initial load.
             pickerInput(
               inputId = "ride_date_select",
               label = "Select Service Date:",
-              choices = as.character(date_choices),
-              selected = as.character(min(date_choices)),
+              # Fallback to current date if 'info' isn't available yet (e.g. at strict startup)
+              choices = if(exists("info")) sort(unique(info$service_date)) else Sys.Date(),
+              selected = if(exists("info")) min(info$service_date) else Sys.Date(),
               options = list(`actions-box` = TRUE, `style` = "btn-primary"),
               multiple = FALSE
             )
@@ -159,22 +151,22 @@ rider_ui <- function() {
 }
 
 # -------------------------------------------------------------------------
-# VISUALIZATION LOGIC
+# DYNAMIC VISUALIZATION LOGIC
 # -------------------------------------------------------------------------
 
 # Plot 1: Daily Time Series (Filtered by day)
-ride.plot1 <- function(whatday) {
+create_ride_plot1 <- function(data, whatday, routes_ref) {
   # Robust check: whatday comes from input, might be NULL initially
-  if(is.null(whatday)) return(NULL)
+  if(is.null(whatday) || is.null(data) || nrow(data) == 0) return(NULL)
   
-  ggplot(info[service_date == whatday], aes(x = datetime, y = passengers_onboard, colour = route_id)) +
+  ggplot(data[service_date == whatday], aes(x = datetime, y = passengers_onboard, colour = route_id)) +
     geom_point(aes(shape = direction_name)) +
     geom_line(aes(group = trip_id)) +
     theme_bw() +
     scale_color_manual(
       name = "Route",
-      values = setNames(routes[, route_color], routes[, route_id]),
-      labels = setNames(routes[, route_name], routes[, route_id])
+      values = setNames(routes_ref[, route_color], routes_ref[, route_id]),
+      labels = setNames(routes_ref[, route_name], routes_ref[, route_id])
     ) +
     scale_shape_discrete(name = "Direction") +
     scale_x_datetime(name = "Time", breaks = "1 hour", date_labels = "%H:%M", expand = expansion(mult = 0.02)) +
@@ -189,22 +181,28 @@ ride.plot1 <- function(whatday) {
 }
 
 # Plot 2: Bar Chart (All days)
-ride.plot2 <- ggplot(ride.data, aes(x = service_date, y = total_passengers, fill = route_id)) +
-  geom_col(width = 0.8, color = 'white', size = 0.2) +
-  geom_text(aes(label = total_passengers), position = position_stack(vjust = 0.5), color = "white", size = 3.5, fontface = "bold") +
-  scale_x_date(name = "Day", breaks = "1 day", date_labels = "%m-%d", expand = expansion(mult = 0)) +
-  scale_y_continuous(name = "Passengers Onboard", expand = expansion(mult = c(0, 0.05))) +
-  scale_fill_manual(
-    name = "Route Info",
-    values = setNames(routes$route_color, routes$route_id),
-    labels = setNames(routes$route_name, routes$route_id),
-    guide = guide_legend(reverse = TRUE) 
-  ) +
-  theme_bw() +
-  theme(
-    panel.grid = element_blank(),
-    legend.position = "bottom",
-    axis.text.x = element_text(angle = 0, vjust = 0.5),
-    plot.title = element_text(face = "bold", size = 14)
-  ) +
-  labs(title = "Daily Passengers by Route")
+create_ride_trend_bar <- function(data, routes_ref) {
+  # RECALCULATE AGGREGATION ON LIVE DATA
+  ride.data <- data[, .(sum(passengers_onboard)), .(route_id, service_date)]
+  setnames(ride.data, "V1", "total_passengers")
+  
+  ggplot(ride.data, aes(x = service_date, y = total_passengers, fill = route_id)) +
+    geom_col(width = 0.8, color = 'white', size = 0.2) +
+    geom_text(aes(label = total_passengers), position = position_stack(vjust = 0.5), color = "white", size = 3.5, fontface = "bold") +
+    scale_x_date(name = "Day", breaks = "1 day", date_labels = "%m-%d", expand = expansion(mult = 0)) +
+    scale_y_continuous(name = "Passengers Onboard", expand = expansion(mult = c(0, 0.05))) +
+    scale_fill_manual(
+      name = "Route Info",
+      values = setNames(routes_ref$route_color, routes_ref$route_id),
+      labels = setNames(routes_ref$route_name, routes_ref$route_id),
+      guide = guide_legend(reverse = TRUE) 
+    ) +
+    theme_bw() +
+    theme(
+      panel.grid = element_blank(),
+      legend.position = "bottom",
+      axis.text.x = element_text(angle = 0, vjust = 0.5),
+      plot.title = element_text(face = "bold", size = 14)
+    ) +
+    labs(title = "Daily Passengers by Route")
+}
