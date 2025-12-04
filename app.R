@@ -26,18 +26,14 @@ if (file.exists(".env")) load_dot_env(".env")
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
 # Source Modules (Order is important for dependencies like 'routes' and 'info')
-source("database_connection.R")
-source("pre.R")  # Loads initial static metadata (routes, stops)
-source("api_utils.R")
-source("dashboard.R")
-source("login.R")
-source("chat.R")
-source("overview.R")
-source("map.R")
-source("weather.R")
-source("crowd.R")
-source("ridership.R")
-source("hour.R")
+print("Sourcing all modules...")
+for (f in c("database_connection.R","pre.R","api_utils.R","dashboard.R",
+            "login.R","chat.R","overview.R","map.R","weather.R",
+            "crowd.R","ridership.R","hour.R")) {
+  print(paste("Sourcing", f))
+  source(f)
+}
+print("All source files loaded.")
 
 
 
