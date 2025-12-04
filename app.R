@@ -26,7 +26,7 @@ OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
 # Source Modules
 # pre.R runs data loading IMMEDIATELY here. 
-# It creates global objects: 'info', 'routes', 'stops', 'sf_stops'
+# It creates global objects: 'info', 'routes', 'stops', 'sf_stops', 'final_choices', etc.
 source("database_connection.R")
 source("pre.R") 
 source("api_utils.R")
@@ -41,7 +41,6 @@ source("ridership.R")
 source("hour.R")
 
 # Ensure image path exists and register it
-# (Assuming you renamed the folder to 'www' lowercase as discussed)
 if (dir.exists("www/index")) {
   addResourcePath("index", "www/index")
 }
@@ -82,12 +81,7 @@ server <- function(input, output, session) {
   
   message("[SERVER] Client connected. Session started.")
 
-  # --- 1. DATA STATE ---
-  # We use the GLOBAL 'info' object loaded by pre.R
-  # For real-time updates, we store results in reactiveVals
-  realtime_delay <- reactiveVal(NULL)
-  
-  # --- 2. AUTHENTICATION & ROUTING ---
+  # --- 1. AUTHENTICATION & ROUTING ---
   authenticated <- reactiveVal(FALSE)
   user_info <- reactiveVal(NULL)
   current_view <- reactiveVal("dashboard")
@@ -171,34 +165,81 @@ server <- function(input, output, session) {
     session$sendCustomMessage("chat_response", resp)
   })
 
-  # Overview
-  output$summaryOutputPlot1 <- renderPlot({ ggplot(info, aes(y = factor(route_id), x = occupancy_rate, color = route_id)) + geom_boxplot() + theme_bw() + guides(color="none") })
-  output$summaryOutputPlot2 <- renderPlot({ ggplot(info, aes(x = route_id, y = delay_min)) + geom_jitter(alpha=0.1) + theme_bw() })
-  output$summaryOutputPlot3 <- renderPlotly({ req(input$summaryplot3whatRoute); create_crowding_pie(info, routes, input$summaryplot3whatRoute) })
+  # -----------------------------------------------------------------------
+  # OVERVIEW PAGE (Connected to new logic)
+  # -----------------------------------------------------------------------
+  output$summaryOutputPlot1 <- renderPlot({ 
+    ggplot(info, aes(y = factor(route_id), x = occupancy_rate, color = route_id)) + 
+      geom_boxplot() + theme_bw() + guides(color="none") 
+  })
+  
+  output$summaryOutputPlot2 <- renderPlot({ 
+    ggplot(info, aes(x = route_id, y = delay_min)) + 
+      geom_jitter(alpha=0.1) + theme_bw() 
+  })
+  
+  output$summaryOutputPlot3 <- renderPlotly({ 
+    req(input$summaryplot3whatRoute) 
+    req(info)
+    # Calls the fixed function in overview.R
+    create_crowding_pie(info, routes, input$summaryplot3whatRoute) 
+  })
 
-  # Map
+  # -----------------------------------------------------------------------
+  # MAP PAGE
+  # -----------------------------------------------------------------------
   output$mapPlotOut <- renderLeaflet({ 
-    # Use global sf_stops from pre.R, pass explicitly to fix "unused argument" error
+    req(sf_stops)
+    # Pass input alpha explicitly
     makemap(sf_stops, input$whatMapalpha) 
   })
   
-  # Other Plots
+  # -----------------------------------------------------------------------
+  # RIDERSHIP PAGE
+  # -----------------------------------------------------------------------
   output$trendPlot <- renderPlot({ ride.plot2 })
-  output$dailyMap <- renderPlotly({ p <- ride.plot1(input$ride_date_select); if(is.null(p)) return(NULL); ggplotly(p) %>% hide_legend() })
+  output$dailyMap <- renderPlotly({ 
+    p <- ride.plot1(input$ride_date_select)
+    if(is.null(p)) return(NULL)
+    ggplotly(p) %>% hide_legend() 
+  })
   
+  # -----------------------------------------------------------------------
+  # WEATHER PAGE
+  # -----------------------------------------------------------------------
   output$wea_hc_output <- renderHighchart({ create_weather_polar_chart() })
   output$wea_gg_output1 <- renderPlot({ create_weather_ridge_plot() })
   output$wea_gg_output2 <- renderPlot({ create_weather_jitter_plot() })
   
-  # --- CROWDING PLOT FIX ---
-  output$crowd_ggplot1 <- renderPlotly({ create_weather_polar_chart() }) # Using polar chart as per your setup
+  # -----------------------------------------------------------------------
+  # CROWD PAGE (Fix applied)
+  # -----------------------------------------------------------------------
   
+  # 1. Map Plot (Occupancy Scatter)
+  output$crowd_ggplot1 <- renderPlotly({ 
+    # This was incorrectly calling weather chart in previous version
+    crowd.plot1 
+  }) 
+  
+  # 2. Bar Chart (Crowding Levels)
   output$crowd_ggplot2 <- renderPlot({ 
-    # FIX: We must aggregate the data here to create the 'N' column
-    # The previous code failed because info has no 'N' column
-    plot_data <- info[, .N, .(route_id, stop_id, crowding_level)]
+    # Safety aggregation to prevent "object 'N' not found" here too
+    req(info)
     
-    ggplot(plot_data, aes(x = stop_id, y = N, fill = crowding_level)) + 
+    # Calculate crowding_level on fly if missing
+    dt_local <- as.data.table(info)
+    if(!"crowding_level" %in% names(dt_local)) {
+       dt_local[, crowding_level := fcase(
+         occupancy_rate < 0.5, "Low",
+         occupancy_rate < 0.85, "Medium",
+         default = "High"
+       )]
+    }
+
+    # Explicit aggregation naming 'N' as 'Count'
+    plot_data <- dt_local[, .(Count = .N), .(route_id, stop_id, crowding_level)]
+    
+    ggplot(plot_data, aes(x = stop_id, y = Count, fill = crowding_level)) + 
       geom_col(position="fill") + 
       theme_minimal() +
       scale_fill_manual(values = c('Low'='#2ca02c', 'Medium'='#ff7f0e', 'High'='#d62728')) +
@@ -206,11 +247,15 @@ server <- function(input, output, session) {
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
   })
   
-  # Delay
+  # -----------------------------------------------------------------------
+  # DELAY PAGE
+  # -----------------------------------------------------------------------
   output$hour_delay_plot1 <- renderPlot({ hour_plot1 })
   output$hour_delay_plot2 <- renderPlot({ hour_plot2(input$hourwhatRoute) })
   
-  # API Buttons
+  # -----------------------------------------------------------------------
+  # AI BUTTONS & API
+  # -----------------------------------------------------------------------
   observeEvent(input$refresh_live_map, { showNotification("Live vehicle data refreshed (Simulation)", type="message") })
   
   observeEvent(input$get_ai_insight, { 
@@ -239,7 +284,5 @@ server <- function(input, output, session) {
   })
 }
 
-# -------------------------------------------------------------------------
-# CRITICAL: Return the app object (Do NOT use port=...)
-# -------------------------------------------------------------------------
+# Run the app
 shinyApp(ui, server)
