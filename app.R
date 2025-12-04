@@ -259,16 +259,15 @@ server <- function(input, output, session) {
   # -----------------------------------------------------------------------
   
   observe({
-    # 1. Listen for changes in route selection
-    req(input$map_route_select)
+    # We removed the selector, so we default to the first available route
+    # or a specific ID like "101"
+    target_route <- if(exists("routes") && nrow(routes) > 0) routes$route_id[1] else "101"
     
-    # 2. Get simulation data for the SPECIFIC selected route
-    target_route <- input$map_route_select
     live_data <- get_live_location(target_route)
     
-    # 3. Update the Map via Proxy (Efficient re-draw)
+    # Update Map via Proxy
     leafletProxy("mapPlotOut") %>%
-      clearGroup("vehicles") # Clear old buses
+      clearGroup("vehicles") 
     
     if (length(live_data$vehicles) > 0) {
       lats <- sapply(live_data$vehicles, function(x) x$lat)
@@ -288,8 +287,7 @@ server <- function(input, output, session) {
           fillOpacity = 0.9,
           popup = paste0(
             "<b>Bus:</b> ", ids, "<br>",
-            "<b>Status:</b> ", status, "<br>",
-            "<b>Route:</b> ", target_route
+            "<b>Status:</b> ", status
           )
         )
     }
