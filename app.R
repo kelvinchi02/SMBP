@@ -190,8 +190,8 @@ server <- function(input, output, session) {
   # -----------------------------------------------------------------------
   output$mapPlotOut <- renderLeaflet({ 
     req(sf_stops)
-    # Pass input alpha explicitly
-    makemap(sf_stops, input$whatMapalpha) 
+    # Pass input$map_route_select to the function so it filters the stops
+    makemap(sf_stops, input$whatMapalpha, input$map_route_select) 
   })
   
   # -----------------------------------------------------------------------
@@ -258,11 +258,16 @@ server <- function(input, output, session) {
   # LIVE MAP LOGIC (Automatic Update)
   # -----------------------------------------------------------------------
   
-  observe({
-    # We removed the selector, so we default to the first available route
-    # or a specific ID like "101"
-    target_route <- if(exists("routes") && nrow(routes) > 0) routes$route_id[1] else "101"
+  observeEvent(c(input$refresh_live_map, input$map_route_select), {
     
+    req(info, input$map_route_select)
+    
+    target_route <- input$map_route_select
+    
+    # Debug message
+    cat(paste0("[DEBUG] Fetching live locations for Route ", target_route, "...\n"))
+    
+    # Get Simulation Data
     live_data <- get_live_location(target_route)
     
     # Update Map via Proxy
@@ -281,15 +286,18 @@ server <- function(input, output, session) {
           lat = lats,
           group = "vehicles",
           radius = 10,
-          color = "white",
+          color = "black",  # Black border for high visibility
           weight = 2,
+          opacity = 1,
           fillColor = ifelse(status == "Delayed", "#E74C3C", "#2ECC71"),
-          fillOpacity = 0.9,
-          popup = paste0(
-            "<b>Bus:</b> ", ids, "<br>",
-            "<b>Status:</b> ", status
-          )
+          fillOpacity = 1.0,
+          popup = paste0("<b>Bus:</b> ", ids, "<br><b>Status:</b> ", status)
         )
+      
+      # Optional: Show a small notification on manual refresh
+      if(input$refresh_live_map > 0) {
+         showNotification(paste("Synced", length(live_data$vehicles), "vehicles"), duration = 2)
+      }
     }
   })
 
