@@ -1,3 +1,9 @@
+message(">>> THIS IS THE ACTIVE app.R <<<")
+message(">>> WORKING DIRECTORY: ", getwd())
+message(">>> FILES HERE: ", paste(list.files(), collapse = ", "))
+
+list.files(recursive = TRUE)
+
 library(shiny)
 library(bslib)
 library(bsicons)
