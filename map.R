@@ -1,16 +1,10 @@
-source("styles.R")
+library(leaflet)
+library(shiny)
+library(shinyWidgets)
 
-# ---------------------------------------------------------
-# NOTE: This file now depends on 'api_utils.R'
-# You must create that file (see Step 2) to avoid errors.
-# ---------------------------------------------------------
-if (file.exists("api_utils.R")) {
-  source("api_utils.R")
-}
-
-# Map page UI
-# map.R
-
+# -------------------------------------------------------------------------
+# UI COMPONENT
+# -------------------------------------------------------------------------
 map_ui <- function() {
   tagList(
     tags$head(
@@ -40,7 +34,7 @@ map_ui <- function() {
         div(
           class = "map-controls",
           
-          # 1. Route Selector (Triggers update automatically)
+          # 1. Route Selector
           div(class = "control-label", "SELECT ROUTE"),
           pickerInput(
             inputId = "map_route_select",
@@ -59,37 +53,38 @@ map_ui <- function() {
   )
 }
 
-# Helper function for map creation (Unchanged from your logic)
-create_route_map <- function(sf_stops, alpha_var = "occupancy_rate") {
-  routes <- unique(sf_stops$route_id)
-  m <- leaflet() %>% addTiles() %>% addProviderTiles(providers$CartoDB.Positron)
-  
-  if(alpha_var == "occupancy_rate") {
-    min_val <- min(sf_stops$occupancy_rate); max_val <- max(sf_stops$occupancy_rate); size_label <- "Occupancy Rate"
-  } else {
-    min_val <- min(sf_stops$delay_min); max_val <- max(sf_stops$delay_min); size_label <- "Delay (minutes)"
-  }
-  
-  for (route in routes) {
-    route_data <- sf_stops %>% filter(route_id == route)
-    route_coords <- do.call(rbind, lapply(route_data$geometry, function(x) st_coordinates(x)))
-    route_line <- st_linestring(route_coords)
-    route_sf <- st_sf(geometry = st_sfc(route_line, crs = st_crs(sf_stops)))
-    
-    m <- m %>% 
-      addPolylines(data = route_sf, color = route_data$route_color[1], weight = 4, opacity = 0.7, group = route_data$route_name[1]) %>%
-      addCircleMarkers(
-        data = route_data,
-        radius = ~ 6 + (get(alpha_var) - min_val) / (max_val - min_val) * 8,
-        stroke = TRUE, color = "white", weight = 1.5,
-        fillColor = route_data$route_color[1], fillOpacity = 0.85,
-        popup = ~paste0("<strong>Stop:</strong> ", stop_id, "<br><strong>Delay:</strong> ", round(delay_min*60), "s"),
-        group = route_data$route_name[1]
-      )
-  }
-  return(m)
-}
+# -------------------------------------------------------------------------
+# LOGIC COMPONENT (Fixed)
+# -------------------------------------------------------------------------
 
-makemap <- function(data_sf, alpha_var = "occupancy_rate") {
-  create_route_map(data_sf, alpha_var)
+makemap <- function(sf_data, alpha_val) {
+  
+  # 1. Safety Check: If data is missing or empty, return a blank map
+  if (is.null(sf_data) || nrow(sf_data) == 0) {
+    return(leaflet() %>% addTiles() %>% setView(lng = -74.006, lat = 40.7128, zoom = 12))
+  }
+
+  # 2. Check if route_color exists, default to blue if not
+  # (Handles cases where pre.R might not have joined the color column)
+  color_formula <- if("route_color" %in% names(sf_data)) {
+    ~route_color 
+  } else {
+    "blue"
+  }
+  
+  # 3. Create Map
+  leaflet(data = sf_data) %>%
+    addProviderTiles(providers$CartoDB.Positron) %>%
+    addCircleMarkers(
+      radius = 6,
+      stroke = FALSE,
+      fillOpacity = alpha_val,
+      fillColor = color_formula, 
+      popup = ~paste0(
+        "<b>Stop:</b> ", stop_name, "<br>",
+        "<b>Route:</b> ", route_id
+      ),
+      # Optional: Cluster options for better performance with many stops
+      # clusterOptions = markerClusterOptions() 
+    )
 }
