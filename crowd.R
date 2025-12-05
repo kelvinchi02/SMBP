@@ -105,23 +105,7 @@ crowd_ui <- function() {
           )
         ),
         
-        # AI Advice Section
-        div(
-          class = "page-section",
-          div(class = "ai-section",
-            div(
-              class = "ai-header",
-              div(class = "ai-title", "AI Crowding & Capacity Advice"),
-              span()
-            ),
-            uiOutput("ai_crowding_display"),
-            div(
-              class = "ai-buttons",
-              actionButton("get_crowding_insight", "Generate AI Insight", class = "btn-ai"),
-              actionButton("add_crowding_trip_btn", "Add Trip to Route", class = "btn-ai btn-add-trip")
-            )
-          )
-        ),
+
         
         # Plot Grid
         div(
