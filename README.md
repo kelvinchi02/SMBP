@@ -76,7 +76,77 @@ The project is modularized for maintainability:
 | **`styles.R`** | Centralized CSS styling. | `htmltools` |
 
 ---
+This directory contains the core datasets used to power the Smart Bus Management Platform. The data is divided into two primary files:
+1. **Operational Telemetry (`SmartTransit_Integrated.csv`)**: A comprehensive record of real-time bus operations, including location, passenger counts, delays, and environmental conditions.
+2. **Static Schedule (`schedule.csv`)**: The baseline timetable used for route planning and AI-driven optimization.
 
+---
+
+## Datasets
+**File:** `SmartTransit_Integrated.csv`
+
+This dataset serves as the primary source for the analytics dashboard. It contains granular records of individual bus trips, capturing metrics at every stop.
+
+### Key Column Groups
+
+#### A. Route & Trip Identification
+* **`datetime`**: Timestamp of the recorded observation.
+* **`service_date`**: The operating date of service.
+* **`route_id`**: Identifier for the transit line (e.g., "A", "B", "C").
+* **`route_name` / `route_long_name`**: Descriptive names of the route (e.g., "Downtown Loop").
+* **`trip_id`**: Unique identifier for a specific trip sequence.
+* **`direction_id` / `direction_name`**: Direction of travel (0/Outbound or 1/Inbound).
+
+#### B. Stop & Location Metrics
+* **`stop_id`**: Unique code for the specific bus stop.
+* **`stop_name`**: Common name of the stop.
+* **`stop_sequence`**: The order of the stop within the trip.
+* **`lat` / `lon`**: Geospatial coordinates (Latitude/Longitude) of the bus at the time of recording.
+* **`stop_zone`**: Classification of the stop area (e.g., Urban, Suburban).
+
+#### C. Operational Performance
+* **`scheduled_arrival`**: The planned arrival time per the timetable.
+* **`actual_arrival`**: The recorded arrival time.
+* **`delay_min`**: The deviation from the schedule in minutes (Positive = Late, Negative = Early).
+* **`headway_min`**: The time interval between the current bus and the preceding one.
+* **`dwell_time_sec`**: Time spent stationary at the stop for boarding/alighting.
+
+#### D. Passenger & Capacity Metrics
+* **`passengers_boarded` / `alighted`**: Counts of passengers entering and exiting.
+* **`passengers_onboard`**: Total current load on the vehicle.
+* **`occupancy_rate`**: The ratio of passengers onboard to total capacity.
+* **`crowding_level`**: Categorical classification of load (Low, Medium, High).
+* **`capacity`**: Maximum passenger limit for the specific vehicle.
+
+#### E. Environmental & Contextual Factors
+* **`weather_conditions`**: General weather state (e.g., cloudy, rain).
+* **`weather_temp_c`**: Ambient temperature in degrees Celsius.
+* **`weather_precip_mm`**: Precipitation volume in millimeters.
+* **`peak`**: Indicator if the trip occurs during peak rush hours.
+
+---
+
+## 2. Static Schedule
+**File:** `schedule.csv`
+
+This file defines the planned service structure. It is utilized by the `scheduler.R` module to compare actual performance against targets and by the AI agent to propose schedule injections.
+
+### Column Schema
+| Column | Data Type | Description |
+| :--- | :--- | :--- |
+| **`route_id`** | String | The identifier of the route (Links to `SmartTransit_Integrated.csv`). |
+| **`scheduled_departure`** | Time | The planned departure time from the terminal or key timing points. |
+| **`headway_min`** | Integer | The planned time interval (frequency) between trips in minutes. |
+
+---
+
+## Usage Notes
+
+* **Data linkage:** The `route_id` and `scheduled_departure` field acts as the primary key connecting the static schedule with the operational data.
+* **Fallback Mechanism:** In the R application, `database_connection.R` is configured to load these CSV files automatically if the connection to the live Supabase database fails.
+* **AI Analysis:** The generative AI module uses the `occupancy_rate` and `delay_min` fields from the integrated dataset to identify bottlenecks and references `schedule.csv` to propose valid time slots for new trips.
+
+---
 ## Installation & Local Setup
 
 1.  **Clone the Repository**
