@@ -14,9 +14,8 @@ supabase_url <- Sys.getenv("SUPABASE_URL")
 supabase_key <- Sys.getenv("SUPABASE_KEY")
 
 # ------------------------------------------------------------
-# 2. Safe conversion helper (remains the same)
+# 2. Safe conversion helper
 # ------------------------------------------------------------
-
 convert_safe <- function(col, type) {
   switch(type,
     "POSIXct"  = suppressWarnings(ymd_hms(col, tz = "UTC")),
@@ -30,134 +29,121 @@ convert_safe <- function(col, type) {
 }
 
 # ------------------------------------------------------------
-# 3. TRUE datatype mapping (remains the same)
+# 3. TYPE MAP
 # ------------------------------------------------------------
-
 type_map <- list(
-  datetime                     = "POSIXct",
-  service_date                 = "Date",
-  route_id                     = "character",
-  route_name                   = "character",
-  trip_id                      = "character",
-  direction_id                 = "integer",
-  direction_name               = "character",
-  stop_id                      = "character",
-  stop_name                    = "character",
-  stop_sequence                = "integer",
-  vehicle_id                   = "character",
-
-  scheduled_arrival            = "POSIXct",
-  actual_arrival               = "POSIXct",
-
-  delay_min                    = "numeric",
-  headway_min                  = "numeric",
-  passengers_waiting           = "integer",
-  passengers_onboard           = "integer",   
-  occupancy_rate               = "numeric",
-
-  peak                         = "character",
-  trip_start_time              = "character",
-  trip_end_time                = "character",
-
-  trip_vehicle_id              = "character",
-  vehicle_model                = "character",
-  vehicle_capacity             = "integer",
-  vehicle_wheelchair_capacity  = "integer",
-  vehicle_bike_rack            = "logical",
-
-  stop_zone                    = "character",
-  route_long_name              = "character",
-  route_length_km              = "numeric",
-  route_color                  = "character",
-
-  weather_temp_c               = "numeric",
-  weather_precip_mm            = "numeric",
-  weather_hourly_conditions    = "character"
+  datetime = "POSIXct", service_date = "Date", route_id = "character", 
+  route_name = "character", trip_id = "character", direction_id = "integer",
+  direction_name = "character", stop_id = "character", stop_name = "character",
+  stop_sequence = "integer", vehicle_id = "character", scheduled_arrival = "POSIXct",
+  actual_arrival = "POSIXct", delay_min = "numeric", headway_min = "numeric",
+  passengers_waiting = "integer", passengers_onboard = "integer", occupancy_rate = "numeric",
+  lat = "numeric", lon = "numeric", weather_temp_c = "numeric", route_length_km = "numeric",
+  crowding_level = "character", route_color = "character",
+  # Schedule table columns
+  scheduled_departure = "character", full_time = "POSIXct"
 )
 
 # ------------------------------------------------------------
-# 4. Main Supabase fetch function (CRITICAL CHANGE)
+# 4. LOAD SUPABASE TABLE (With CSV Fail-Safe)
 # ------------------------------------------------------------
-
 load_supabase_table <- function(table_name) {
-  # Perform environment check ONLY when the data is actually needed
-  if (supabase_url == "" || supabase_key == "") {
-    message("[ERROR] Supabase credentials missing. Returning empty data table.")
-    # Return an empty data table with correct columns to prevent further errors
-    empty_df <- data.table(
-        datetime=as.POSIXct(character(0)), service_date=as.Date(character(0)), 
-        route_id=character(0), delay_min=numeric(0), hour=factor(character(0), levels=NULL)
-    )
-    # Add other critical columns needed for pre.R to function
-    for (col in names(type_map)) {
-        if (!col %in% names(empty_df)) {
-             empty_df[, (col) := vector(mode(type_map[[col]]), 0)]
-        }
+  
+  # Helper to create an empty table with correct schema
+  create_empty_schema <- function() {
+    dt <- data.table()
+    for (col_name in names(type_map)) {
+      dt[[col_name]] <- vector(mode = "logical", length = 0)
     }
-    return(empty_df)
+    return(dt)
+  }
+
+  # --- ATTEMPT 1: API Connection ---
+  if (supabase_url != "" && supabase_key != "") {
+    tryCatch({
+      endpoint <- paste0(supabase_url, "/rest/v1/", table_name, "?select=*")
+      
+      req <- request(endpoint) |>
+        req_headers(
+          "apikey" = supabase_key,
+          "Authorization" = paste("Bearer", supabase_key)
+        ) |>
+        req_timeout(5) # Fast timeout to switch to CSV quickly
+      
+      resp <- req_perform(req)
+      
+      if (resp_status(resp) == 200) {
+        raw <- resp_body_json(resp, simplifyVector = TRUE)
+        dt <- as.data.table(raw)
+        
+        # Type conversion
+        for (col in names(type_map)) {
+          if (col %in% names(dt)) {
+            dt[[col]] <- convert_safe(dt[[col]], type_map[[col]])
+          }
+        }
+        return(dt)
+      }
+    }, error = function(e) {
+      message(paste("[WARNING] API Failed for", table_name, ":", e$message))
+      # Fall through to CSV
+    })
   }
   
-  # API call logic inside tryCatch to handle transient network errors
-  tryCatch({
-    endpoint <- paste0(supabase_url, "/rest/v1/", table_name, "?select=*")
-
-    req <- request(endpoint) |>
-      req_headers(
-        "apikey" = supabase_key,
-        "Authorization" = paste("Bearer", supabase_key)
-      )
-
-    resp <- req_perform(req)
-
-    raw <- resp_body_json(resp, simplifyVector = TRUE)
-
-    dt <- as.data.table(raw)
-
-    # Apply type conversion where columns match the map
+  # --- ATTEMPT 2: CSV Fail-Safe ---
+  csv_file <- paste0(table_name, ".csv")
+  # Handle special case for schedule table mapping
+  if (table_name == "bus_schedule") csv_file <- "schedule.csv"
+  
+  if (file.exists(csv_file)) {
+    message(paste("[SYSTEM] Switching to Offline Mode: Loading", csv_file))
+    dt <- fread(csv_file)
+    
+    # Apply type conversions to CSV data
     for (col in names(type_map)) {
       if (col %in% names(dt)) {
         dt[[col]] <- convert_safe(dt[[col]], type_map[[col]])
       }
     }
-
     return(dt)
-  }, error = function(e) {
-    message(paste("[ERROR] Failed to fetch data from Supabase:", e$message))
-    return(data.table()) # Return empty table on API failure
-  })
-}
-
-
-# ------------------------------------------------------------
-# 5. Lightweight Check Function (CRITICAL CHANGE)
-# ------------------------------------------------------------
-
-get_latest_timestamp <- function(table_name) {
-  if (supabase_url == "" || supabase_key == "") {
-    return(Sys.time()) # Return current time so reactivePoll doesn't crash
   }
   
-  tryCatch({
-    # Logic: Select 'datetime', Order by 'datetime' DESC, Limit to 1 row.
-    endpoint <- paste0(supabase_url, "/rest/v1/", table_name,
-                       "?select=datetime&order=datetime.desc&limit=1")
+  # --- FINAL FALLBACK: Empty Table ---
+  message("[ERROR] No Data Source Available (API & CSV Failed)")
+  return(create_empty_schema())
+}
 
-    req <- request(endpoint) |>
-      req_headers(
-        "apikey" = supabase_key,
-        "Authorization" = paste("Bearer", supabase_key)
-      )
-
-    resp <- req_perform(req)
-    raw <- resp_body_json(resp, simplifyVector = TRUE)
-
-    # Return the specific timestamp string or current time on empty result
-    if (length(raw) == 0 || nrow(raw) == 0) {
-      return(Sys.time())
+# ------------------------------------------------------------
+# 5. TIMESTAMP CHECK
+# ------------------------------------------------------------
+get_latest_timestamp <- function(table_name) {
+  
+  # Try API First
+  if (supabase_url != "" && supabase_key != "") {
+    tryCatch({
+      endpoint <- paste0(supabase_url, "/rest/v1/", table_name, "?select=datetime&order=datetime.desc&limit=1")
+      req <- request(endpoint) |>
+        req_headers("apikey" = supabase_key, "Authorization" = paste("Bearer", supabase_key)) |>
+        req_timeout(2)
+      
+      resp <- req_perform(req)
+      raw <- resp_body_json(resp, simplifyVector = TRUE)
+      
+      if (length(raw) > 0) return(raw$datetime[1])
+      
+    }, error = function(e) {
+      # Ignore error, proceed to fallback
+    })
+  }
+  
+  # Fallback: Read local CSV to find last timestamp
+  # This simulates "live" time by just returning the max time in the CSV
+  if (file.exists("SmartTransit_Integrated.csv")) {
+    dt <- fread("SmartTransit_Integrated.csv", select = "datetime")
+    if (nrow(dt) > 0) {
+      return(max(dt$datetime))
     }
-    return(raw$datetime[1])
-  }, error = function(e) {
-    message(paste("[ERROR] Lightweight check failed:", e$message))
-    return(Sys.time()) # Return current time on failure
-  })
+  }
+  
+  return(Sys.time())
 }
