@@ -164,11 +164,10 @@ server <- function(input, output, session) {
     session$sendCustomMessage("chat_response", call_chatgpt(messages_to_send))
   })
   
-  # --- SCHEDULER MODULE LOGIC (FIXED: Live Time Sync) ---
+  # --- SCHEDULER MODULE LOGIC (LOGGING ADDED) ---
   
   output$schedule_table <- DT::renderDataTable({
-    # CRITICAL: Depend on live_info() so this re-renders every time the DB updates
-    # This forces the 'current_sim_time' to refresh automatically
+    # Forces re-run whenever database updates
     req(live_info()) 
     req(local_schedule())
     
@@ -176,6 +175,10 @@ server <- function(input, output, session) {
     
     # 3. Use Database Timestamp as "Current Time" Proxy
     current_sim_time <- get_latest_timestamp("SmartTransit_Integrated")
+    
+    # --- LOGGING TO CONSOLE ---
+    message(paste("[SCHEDULER] Simulation Proxy Time:", current_sim_time))
+    # --------------------------
     
     # Filter for trips LATER than the database update time
     future_sched <- sched[full_time > current_sim_time][order(full_time)]
