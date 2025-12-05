@@ -14,7 +14,7 @@ message(paste("[SYSTEM] Initialization started at:", global_start_time))
 # -------------------------------------------------------------------------
 # 1. DATABASE CONNECTION
 # -------------------------------------------------------------------------
-source("database_connection.R")
+
 
 message("[STEP 1] Initiating database connection and data retrieval...")
 t1_start <- Sys.time()
