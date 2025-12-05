@@ -12,6 +12,7 @@ library(data.table)
 library(plotly)
 library(highcharter)
 library(ggridges)
+library(DT)
 
 # Initialize Startup Timer
 startup_start <- Sys.time()
@@ -21,7 +22,7 @@ message(paste("[SYSTEM] Application startup initiated at:", startup_start))
 # 1. SETUP & MODULE LOADING
 # -------------------------------------------------------------------------
 
-# Load environment variables (critical for Supabase)
+# Load environment variables
 if (file.exists(".env")) load_dot_env(".env")
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
@@ -39,10 +40,9 @@ source("crowd.R")
 source("ridership.R")
 source("hour.R")
 source("styles.R")
-# Added scheduler.R to ensure the AI Schedule button works
 source("scheduler.R") 
 
-# Ensure image path exists and register it
+# Ensure image path exists
 if (dir.exists("www/index")) {
   addResourcePath("index", "www/index")
 }
@@ -92,44 +92,43 @@ server <- function(input, output, session) {
   
   message("[SERVER] Client connected. Session started.")
   
-  # -----------------------------------------------------------------------
-  # 0. AUTO-REFRESH LOGIC
-  # -----------------------------------------------------------------------
+  # --- 0. LOCAL SCHEDULE STORAGE (SIMULATION MODE) ---
+  # This var holds the schedule in memory. We load it once from DB, then modify locally.
+  local_schedule <- reactiveVal(data.table())
   
+  # Initialize schedule ONCE on startup
+  observe({
+    req(is.null(isolate(local_schedule())) || nrow(isolate(local_schedule())) == 0)
+    
+    message("[SYSTEM] Loading schedule from Supabase into local simulation memory...")
+    initial_data <- load_supabase_table("bus_schedule")
+    
+    if (nrow(initial_data) > 0) {
+      # Ensure time format is usable
+      if(inherits(initial_data$scheduled_departure, "character")) {
+         # Assuming format is HH:MM:SS, we prepend today's date for sorting
+         initial_data[, full_time := as.POSIXct(paste(Sys.Date(), scheduled_departure))]
+      } else {
+         initial_data[, full_time := scheduled_departure]
+      }
+      local_schedule(initial_data)
+    }
+  })
+
+  # --- 0.1 AUTO-REFRESH LOGIC (LIVE BUS DATA) ---
   live_info <- reactivePoll(
     intervalMillis = 5000,
     session = session,
-    
-    checkFunc = function() {
-      get_latest_timestamp("SmartTransit_Integrated")
-    },
-    
+    checkFunc = function() { get_latest_timestamp("SmartTransit_Integrated") },
     valueFunc = function() {
-      message("[SYSTEM] New data detected. Refreshing dataset...")
-      
       df <- load_supabase_table("SmartTransit_Integrated")
-      
-      if(inherits(df$scheduled_arrival, "character")) {
-        df[, scheduled_arrival := lubridate::ymd_hms(scheduled_arrival)]
-      }
-      
+      if(inherits(df$scheduled_arrival, "character")) { df[, scheduled_arrival := lubridate::ymd_hms(scheduled_arrival)] }
       df[, hour := lubridate::hour(scheduled_arrival)]
       df[, hour := factor(hour, levels = sort(unique(hour)))]
-      
-      df[, delay_category := data.table::fcase(
-        delay_min > 0, "Delayed",
-        delay_min < 0, "Early",
-        delay_min == 0, "On-time"
-      )]
-      
+      df[, delay_category := data.table::fcase(delay_min > 0, "Delayed", delay_min < 0, "Early", delay_min == 0, "On-time")]
       if (!"crowding_level" %in% names(df)) {
-        df[, crowding_level := data.table::fcase(
-           occupancy_rate < 0.5, "Low",
-           occupancy_rate < 0.85, "Medium",
-           default = "High"
-        )]
+        df[, crowding_level := data.table::fcase(occupancy_rate < 0.5, "Low", occupancy_rate < 0.85, "Medium", default = "High")]
       }
-      
       return(df)
     }
   )
@@ -140,64 +139,32 @@ server <- function(input, output, session) {
   current_view <- reactiveVal("dashboard")
   
   output$root_ui <- renderUI({
-    if (!authenticated()) {
-      login_ui()
-    } else {
-      tagList(
-        dashboard_ui(user_name = user_info()$name),
-        chat_ui()
-      )
-    }
+    if (!authenticated()) { login_ui() } else { tagList(dashboard_ui(user_name = user_info()$name), chat_ui()) }
   })
 
-  # Login Logic
   observeEvent(input$login_btn, {
     req(input$login_username, input$login_password)
     auth_result <- authenticate_user(input$login_username, input$login_password)
-    
     if (auth_result$success) {
-      authenticated(TRUE)
-      user_info(list(name = input$login_username))
+      authenticated(TRUE); user_info(list(name = input$login_username))
       session$sendCustomMessage("saveUserInfo", list(username = input$login_username, name = input$login_username))
     } else {
-      insertUI(selector = "#login_error", where = "afterBegin",
-               ui = div(style = "color:red; margin-top:10px; font-weight:bold;", auth_result$message))
+      insertUI(selector = "#login_error", where = "afterBegin", ui = div(style = "color:red; margin-top:10px; font-weight:bold;", auth_result$message))
     }
   })
-
-  # Auto-login & Logout
-  observeEvent(input$restore_session, {
-    tryCatch({
-      user_data <- jsonlite::fromJSON(input$restore_session)
-      if (!is.null(user_data$username)) {
-        authenticated(TRUE)
-        user_info(user_data)
-      }
-    }, error = function(e) { session$sendCustomMessage("clearStorage", list()) })
-  })
-
-  observeEvent(input$logout_btn, {
-    authenticated(FALSE)
-    user_info(NULL)
-    current_view("dashboard")
-    session$sendCustomMessage("clearStorage", list())
-  })
-
+  
+  observeEvent(input$restore_session, { tryCatch({ user_data <- jsonlite::fromJSON(input$restore_session); if (!is.null(user_data$username)) { authenticated(TRUE); user_info(user_data) } }, error = function(e) { session$sendCustomMessage("clearStorage", list()) }) })
+  observeEvent(input$logout_btn, { authenticated(FALSE); user_info(NULL); current_view("dashboard"); session$sendCustomMessage("clearStorage", list()) })
   observeEvent(input$nav_selection, { current_view(input$nav_selection) })
   observeEvent(input$back_to_home, { current_view("dashboard") })
 
   # --- 3. DASHBOARD CONTENT ---
-  output$topbar_title_dynamic <- renderUI({
-    req(authenticated())
-    div(class = "topbar-title", "Smart Bus Management Platform")
-  })
-
+  output$topbar_title_dynamic <- renderUI({ req(authenticated()); div(class = "topbar-title", "Smart Bus Management Platform") })
   output$dashboard_content <- renderUI({
     req(authenticated())
     switch(current_view(),
       "dashboard" = dashboard_home_content(),
       "overview" = overview_ui(),
-      # Added scheduler UI routing
       "scheduler" = scheduler_ui(),
       "delay" = delay_ui(),
       "ridership" = rider_ui(),
@@ -208,90 +175,59 @@ server <- function(input, output, session) {
   })
 
   # --- 4. MODULE SERVER LOGIC ---
-  
-  # Chat (STATELESS MODE)
   observeEvent(input$chat_message, {
     req(input$chat_message$text, live_info())
     user_message <- input$chat_message$text
+    system_persona <- list(role = "system", content = "You are the Smart Transit AI Assistant. Analyze the current live data provided. Provide concise, data-driven answers.")
+    live_context <- list(role = "system", content = paste0("CURRENT LIVE SYSTEM STATUS:\n", get_live_kpi_summary(live_info())))
+    messages_to_send <- list(system_persona, live_context, list(role = "user", content = user_message))
+    session$sendCustomMessage("chat_response", call_chatgpt(messages_to_send))
+  })
+  
+  # --- SCHEDULER MODULE LOGIC (UPDATED) ---
+  
+  # 1. Render the 3-Column Schedule Table (Next 10 Departures)
+  output$schedule_table <- DT::renderDataTable({
+    req(local_schedule())
     
-    # 1. Define Persona
-    system_persona <- list(role = "system", content = paste0(
-      "You are the Smart Transit AI Assistant. Analyze the current live data provided below. ",
-      "Provide concise, data-driven answers to transit managers. Do not mention that this data was injected."
-    ))
-
-    # 2. Generate Live Data Context
-    live_data_summary <- get_live_kpi_summary(live_info())
-    live_context <- list(role = "system", content = paste0("CURRENT LIVE SYSTEM STATUS:\n", live_data_summary))
+    sched <- local_schedule()
     
-    # 3. User Question
-    user_msg_obj <- list(role = "user", content = user_message)
+    # Filter for future trips only
+    current_time <- Sys.time()
+    future_sched <- sched[full_time > current_time][order(full_time)]
     
-    # 4. Construct Stateless Message List
-    messages_to_send <- list(
-        system_persona,
-        live_context,
-        user_msg_obj
+    if(nrow(future_sched) == 0) return(NULL)
+    
+    # Helper to get next 10 times for a route
+    get_next_10 <- function(r_id) {
+      times <- future_sched[route_id == r_id, head(format(full_time, "%H:%M"), 10)]
+      # Pad with empty strings if less than 10
+      length(times) <- 10
+      return(times)
+    }
+    
+    # Construct the display table
+    display_df <- data.frame(
+      "Route A" = get_next_10("A"),
+      "Route B" = get_next_10("B"),
+      "Route C" = get_next_10("C"),
+      stringsAsFactors = FALSE
     )
     
-    # 5. Call Groq
-    ai_response <- call_chatgpt(messages_to_send) 
+    # Replace NAs with "--"
+    display_df[is.na(display_df)] <- "--"
     
-    # 6. Send Response to UI
-    session$sendCustomMessage("chat_response", ai_response)
+    DT::datatable(display_df, 
+      options = list(dom = 't', pageLength = 10, ordering = FALSE),
+      rownames = FALSE,
+      class = 'cell-border stripe compact'
+    )
   })
-  
-  # --- OPERATIONAL ACTIONS (WRITE-BACK) ---
-  observeEvent(input$add_ridership_trip_btn, {
-    result <- add_ridership_trip("B", 10, 5000, 1) 
-    if (is.null(result$error)) {
-      showNotification(paste(result$message, "New Headway:", result$new_headway, "min"), type = "message")
-    } else {
-      showNotification(paste("Failed:", result$error), type = "error")
-    }
-  })
-  
-  observeEvent(input$add_crowding_trip_btn, {
-    result <- add_crowding_trip("A", 12, 0.9, 1) 
-    if (is.null(result$error)) {
-      showNotification(paste(result$message, "Occupancy Reduction:", result$occupancy_reduction*100, "%"), type = "message")
-    } else {
-      showNotification(paste("Failed:", result$error), type = "error")
-    }
-  })
-  
-  # -----------------------------------------------------------------------
-  # AI INSIGHT LOGIC
-  # -----------------------------------------------------------------------
-  observeEvent(input$get_ai_insight, { 
-    data <- generate_ai_delay_summary()
-    output$ai_insight_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  observeEvent(input$get_stop_insight, {
-    data <- get_ai_stop_summary()
-    output$ai_stop_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data$analysis))) })
-  })
-  observeEvent(input$get_weather_insight, {
-    data <- generate_ai_weather_summary()
-    output$ai_weather_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  observeEvent(input$get_crowding_insight, {
-    data <- generate_ai_crowding_summary()
-    output$ai_crowding_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  observeEvent(input$get_ridership_insight, {
-    data <- generate_ai_ridership_summary()
-    output$ai_ridership_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  
 
-  # --- SCHEDULER MODULE LOGIC ---
-  
-  # Reactive values for the proposal state
+  # 2. AI Proposal Logic
   proposal_state <- reactiveValues(active = FALSE, route = NULL, time = NULL, reason = NULL)
   
   observeEvent(input$scan_system_btn, {
-    # 1. Scan Routes A, B, C sequentially
     routes_to_scan <- c("A", "B", "C")
     found_issue <- FALSE
     
@@ -299,7 +235,6 @@ server <- function(input, output, session) {
       analysis <- get_route_crowding_profile(live_info(), r)
       if (is.null(analysis)) next
       
-      # Ask AI
       prompt <- list(
         list(role="system", content="You are an Operations AI. Check the profile. If recommendation is YES, output 'DECISION: YES | REASON: [Brief reason]'. If NO, output 'DECISION: NO'."),
         list(role="user", content=analysis$profile_text)
@@ -307,15 +242,11 @@ server <- function(input, output, session) {
       response <- call_chatgpt(prompt)
       
       if (grepl("DECISION: YES", response)) {
-        # Found an issue! Populate proposal and stop scanning.
         proposal_state$active <- TRUE
         proposal_state$route <- r
         proposal_state$time <- analysis$suggested_time
         proposal_state$reason <- sub(".*REASON:", "", response)
-        
-        output$scheduler_ai_message <- renderUI({ 
-          div(strong(paste("Issue Detected on Route", r)), br(), trimws(proposal_state$reason)) 
-        })
+        output$scheduler_ai_message <- renderUI({ div(strong(paste("Issue Detected on Route", r)), br(), trimws(proposal_state$reason)) })
         found_issue <- TRUE
         break 
       }
@@ -327,7 +258,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # Render Proposal Card
   output$scheduler_proposal_card <- renderUI({
     if (proposal_state$active) {
       div(class="proposal-card",
@@ -340,7 +270,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # Render Confirm Button (Active/Disabled)
   output$scheduler_confirm_btn_ui <- renderUI({
     if (proposal_state$active) {
       actionButton("confirm_schedule_btn", "Confirm & Add Schedule", class = "btn-confirm", icon = icon("plus"))
@@ -349,26 +278,40 @@ server <- function(input, output, session) {
     }
   })
   
-  # Dismiss Action
   observeEvent(input$dismiss_proposal_btn, {
     proposal_state$active <- FALSE
     output$scheduler_ai_message <- renderUI({ "Suggestion dismissed." })
   })
   
-  # Confirm Action
+  # 3. Confirm Logic (UPDATED: Modifies Local Var Only)
   observeEvent(input$confirm_schedule_btn, {
-    req(proposal_state$active)
-    add_new_trip_to_db(proposal_state$route) 
+    req(proposal_state$active, local_schedule())
     
-    showNotification(paste("✅ Added Trip to Route", proposal_state$route, "at", proposal_state$time), type="message")
+    # Create the new row
+    new_time_str <- proposal_state$time # Format HH:MM:SS
+    new_datetime <- as.POSIXct(paste(Sys.Date(), new_time_str))
+    
+    new_row <- data.table(
+      route_id = proposal_state$route,
+      scheduled_departure = new_time_str,
+      headway_min = 15, # Default value for inserted trip
+      full_time = new_datetime
+    )
+    
+    # Append to local schedule and re-sort
+    current <- local_schedule()
+    updated <- rbind(current, new_row, fill = TRUE)
+    updated <- updated[order(full_time)]
+    
+    # Update the reactive variable
+    local_schedule(updated)
+    
+    showNotification(paste("✅ [SIMULATION] Added Trip to Route", proposal_state$route, "at", proposal_state$time), type="message")
     proposal_state$active <- FALSE
-    output$scheduler_ai_message <- renderUI({ "Action completed successfully." })
+    output$scheduler_ai_message <- renderUI({ "Action completed successfully (Local Update)." })
   })
 
-
-  # -----------------------------------------------------------------------
-  # DASHBOARD PLOT RENDERING
-  # -----------------------------------------------------------------------
+  # --- PLOT RENDERING ---
   output$summaryOutputPlot1 <- renderPlot({ current_data <- live_info(); req(current_data, exists("routes")); create_occupancy_box(current_data, routes) })
   output$summaryOutputPlot2 <- renderPlot({ current_data <- live_info(); req(current_data, exists("routes")); create_delay_jitter(current_data, routes) })
   output$summaryOutputPlot3 <- renderPlotly({ req(input$summaryplot3whatRoute); current_data <- live_info(); req(current_data, exists("routes")); create_crowding_pie(current_data, routes, input$summaryplot3whatRoute) })
@@ -377,8 +320,7 @@ server <- function(input, output, session) {
   output$trendPlot <- renderPlot({ req(live_info(), exists("routes")); create_ride_trend_bar(live_info(), routes) })
   output$dailyMap <- renderPlotly({ req(input$ride_date_select, live_info(), exists("routes")); p <- create_ride_plot1(live_info(), input$ride_date_select, routes); if(is.null(p)) return(NULL); ggplotly(p) %>% hide_legend() })
   output$crowding_breakdown_display <- renderUI({ current_data <- live_info(); req(current_data); dt_local <- as.data.table(current_data); dt_local[, crowding_level := fcase(occupancy_rate < 0.5, "Low", occupancy_rate < 0.85, "Medium", default = "High")]; kpis <- get_crowding_kpis(dt_local); div(class = "breakdown-grid", div(class = "breakdown-item", div(class = "breakdown-label", "Low Crowding Trips"), div(class = "breakdown-value low", kpis$low_count)), div(class = "breakdown-item", div(class = "breakdown-label", "Medium Crowding Trips"), div(class = "breakdown-value medium", kpis$med_count)), div(class = "breakdown-item", div(class = "breakdown-label", "High Crowding Trips"), div(class = "breakdown-value high", kpis$high_count))) })
-  output$crowding_kpis <- renderUI({ current_data <- live_info(); req(current_data); kpis <- get_crowding_kpis(current_data); avg_occ_text <- kpis$avg_occupancy; occ_class <- if (grepl("^0\\.[0-4]", avg_occ_text)) "normal" else if (grepl("^0\\.[5-8]", avg_occ_text)) "busy" else "critical"; div(class = "kpi-grid", div(class = "kpi-card", div(class = "kpi-label", "Average Occupancy"), div(class = paste("kpi-value", occ_class), kpis$avg_occupancy)), div(class = "kpi-card", div(class = "kpi-label", "Overload Risk Zones (>85%)"), div(class = "kpi-value critical", kpis$risk_zones))
-  ) })
+  output$crowding_kpis <- renderUI({ current_data <- live_info(); req(current_data); kpis <- get_crowding_kpis(current_data); avg_occ_text <- kpis$avg_occupancy; occ_class <- if (grepl("^0\\.[0-4]", avg_occ_text)) "normal" else if (grepl("^0\\.[5-8]", avg_occ_text)) "busy" else "critical"; div(class = "kpi-grid", div(class = "kpi-card", div(class = "kpi-label", "Average Occupancy"), div(class = paste("kpi-value", occ_class), kpis$avg_occupancy)), div(class = "kpi-card", div(class = "kpi-label", "Overload Risk Zones (>85%)"), div(class = "kpi-value critical", kpis$risk_zones)) ) })
   output$crowd_ggplot1 <- renderPlotly({ req(live_info()); create_crowd_map(live_info()) }) 
   output$crowd_ggplot2 <- renderPlot({ req(live_info()); create_crowd_bar(live_info()) }) 
   output$realtime_kpis <- renderUI({ current_data <- live_info(); req(current_data); kpis <- get_realtime_kpis(current_data); punctuality_class <- fcase(kpis$punctuality < 75, "bad", kpis$punctuality < 90, "warning", default = "good"); delay_class <- fcase(kpis$avg_delay > 2, "bad", kpis$avg_delay > 1, "warning", default = "good"); div(class = "kpi-grid", div(class = "kpi-card", div(class = "kpi-label", "Punctuality Rate"), div(class = paste("kpi-value", punctuality_class), paste0(kpis$punctuality, "%"))), div(class = "kpi-card", div(class = "kpi-label", "Avg. Delay (min)"), div(class = paste("kpi-value", delay_class), kpis$avg_delay)), div(class = "kpi-card", div(class = "kpi-label", "Active Issues"), div(class = "kpi-value warning", kpis$active_issues))) })
@@ -411,7 +353,4 @@ server <- function(input, output, session) {
   })
 }
 
-# -------------------------------------------------------------------------
-# 4. RUN APPLICATION (Execution)
-# -------------------------------------------------------------------------
 shinyApp(ui, server)

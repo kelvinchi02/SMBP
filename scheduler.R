@@ -36,11 +36,11 @@ scheduler_ui <- function() {
         
         /* Column 3: Actions */
         .action-panel { padding: 25px; display: flex; flex-direction: column; gap: 12px; justify-content: center; align-items: center; background-color: #fff; }
-        .btn-confirm-lg { width: 100%; background-color: #28a745; color: white; font-weight: 700; padding: 10px; border: none; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem; }
-        .btn-confirm-lg:hover { background-color: #218838; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2); }
-        .btn-dismiss-lg { width: 100%; background-color: transparent; color: #dc3545; border: 1px solid #dc3545; font-weight: 600; padding: 8px; border-radius: 6px; transition: all 0.2s; font-size: 0.9rem; }
-        .btn-dismiss-lg:hover { background-color: #fff5f5; }
-        .btn-disabled-lg { background-color: #e9ecef !important; color: #adb5bd !important; border: 1px solid #dee2e6 !important; cursor: not-allowed; box-shadow: none; }
+        .btn-confirm { width: 100%; background-color: #28a745; color: white; font-weight: 700; padding: 10px; border: none; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem; }
+        .btn-confirm:hover { background-color: #218838; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2); }
+        .btn-dismiss { width: 100%; background-color: transparent; color: #dc3545; border: 1px solid #dc3545; font-weight: 600; padding: 8px; border-radius: 6px; transition: all 0.2s; font-size: 0.9rem; }
+        .btn-dismiss:hover { background-color: #fff5f5; }
+        .btn-disabled { background-color: #e9ecef !important; color: #adb5bd !important; border: 1px solid #dee2e6 !important; cursor: not-allowed; box-shadow: none; }
         
         .status-optimal { color: #28a745; font-weight: 600; padding: 10px; border-radius: 6px; background: #e8f5e9; border: 1px solid #c3e6cb; display: inline-block; }
 
@@ -52,10 +52,10 @@ scheduler_ui <- function() {
       
       div(class = "page-content",
         
-        # 1. Top Section: Schedule Board
+        # 1. Top Section: Schedule Board (Live Simulation)
         div(class = "schedule-board",
           div(class = "board-header",
-            div(class = "board-title", icon("calendar-alt"), " Upcoming Scheduled Departures"),
+            div(class = "board-title", icon("calendar-alt"), " Next 10 Scheduled Departures (Live Simulation)"),
             div(class = "board-status", uiOutput("schedule_last_updated"))
           ),
           DT::dataTableOutput("schedule_table")
@@ -90,7 +90,7 @@ scheduler_ui <- function() {
                 # Column 3: Confirm/Dismiss
                 div(class = "action-panel",
                     uiOutput("scheduler_confirm_btn_ui"),
-                    actionButton("dismiss_proposal_btn", "Dismiss", class = "btn-dismiss-lg", icon = icon("times"))
+                    actionButton("dismiss_proposal_btn", "Dismiss", class = "btn-dismiss", icon = icon("times"))
                 )
             )
         )
