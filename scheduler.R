@@ -20,7 +20,7 @@ scheduler_ui <- function() {
         
         .ai-insight-panel { padding: 25px; border-right: 1px solid #eee; display: flex; flex-direction: column; justify-content: space-between; }
         .ai-text-box { background: #f1f8ff; border-left: 4px solid #007bff; padding: 15px; border-radius: 6px; color: #2c3e50; font-size: 0.95rem; line-height: 1.5; margin-bottom: 15px; flex-grow: 1; }
-        .scan-controls { margin-top: 10px; }
+        .scan-controls { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
         
         .proposal-panel { padding: 25px; border-right: 1px solid #eee; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #fff; }
         .prop-time-large { font-size: 2rem; font-weight: 800; color: #2c3e50; margin: 5px 0; letter-spacing: -0.5px; }
@@ -35,6 +35,9 @@ scheduler_ui <- function() {
         .btn-disabled { background-color: #e9ecef !important; color: #adb5bd !important; border: 1px solid #dee2e6 !important; cursor: not-allowed; box-shadow: none; }
         
         .status-optimal { color: #28a745; font-weight: 600; padding: 10px; border-radius: 6px; background: #e8f5e9; border: 1px solid #c3e6cb; display: inline-block; }
+        .scan-badge { font-size: 0.75rem; color: #6c757d; background: #f8f9fa; padding: 4px 8px; border-radius: 4px; border: 1px solid #dee2e6; display: inline-flex; align-items: center; gap: 5px; }
+        .pulse-dot { width: 8px; height: 8px; background-color: #2ecc71; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
       "))
     ),
     
@@ -63,7 +66,8 @@ scheduler_ui <- function() {
                 div(class = "ai-insight-panel",
                     uiOutput("scheduler_ai_message"),
                     div(class = "scan-controls",
-                        actionButton("scan_system_btn", "Run System Scan", icon = icon("search"), class = "btn-scan", style="width: auto; padding: 8px 20px; font-size: 0.9rem; background-color: #34495e; color: white; border:none; border-radius: 4px;")
+                        # Replaced Button with Passive Indicator
+                        div(class="scan-badge", div(class="pulse-dot"), "Auto-Scan Active (30s)")
                     )
                 ),
                 div(class = "proposal-panel", uiOutput("scheduler_proposal_card")),
