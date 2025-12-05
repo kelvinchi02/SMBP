@@ -22,11 +22,9 @@ message(paste("[SYSTEM] Application startup initiated at:", startup_start))
 # 1. SETUP & MODULE LOADING
 # -------------------------------------------------------------------------
 
-# Load environment variables
 if (file.exists(".env")) load_dot_env(".env")
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
-# Source Modules
 source("database_connection.R")
 source("pre.R")
 source("api_utils.R")
@@ -42,17 +40,12 @@ source("hour.R")
 source("styles.R")
 source("scheduler.R") 
 
-# Ensure image path exists
 if (dir.exists("www/index")) {
   addResourcePath("index", "www/index")
 }
 
-# -------------------------------------------------------------------------
-# 2. MAIN UI SHELL DEFINITION
-# -------------------------------------------------------------------------
 ui <- page_fluid(
   style = "padding: 0; margin: 0;",
-  
   tags$head(
     tags$script(HTML("
       $(document).on('shiny:connected', function() {
@@ -67,49 +60,36 @@ ui <- page_fluid(
       Shiny.addCustomMessageHandler('clearStorage', function(data) {
         localStorage.removeItem('bus_user_info');
       });
-       $(document).on('shiny:value', function(event) {
-        if (event.name === 'login_error_trigger') {
-          var msg = event.value;
-          if (msg && msg.length > 0) {
-            $('#error-msg').text(msg).addClass('show');
-            setTimeout(function() { $('#error-msg').removeClass('show'); }, 3000);
-          }
-        }
-      });
     "))
   ),
-  
   uiOutput("root_ui")
 )
 
-message(sprintf("[SYSTEM] UI definition complete. Total setup time: %s seconds", round(difftime(Sys.time(), startup_start, units = "secs"), 2)))
-
-
-# -------------------------------------------------------------------------
-# 3. SERVER LOGIC
-# -------------------------------------------------------------------------
 server <- function(input, output, session) {
   
   message("[SERVER] Client connected. Session started.")
   
   # --- 0. LOCAL SCHEDULE STORAGE (SIMULATION MODE) ---
-  # This var holds the schedule in memory. We load it once from DB, then modify locally.
   local_schedule <- reactiveVal(data.table())
   
   # Initialize schedule ONCE on startup
   observe({
     req(is.null(isolate(local_schedule())) || nrow(isolate(local_schedule())) == 0)
     
-    message("[SYSTEM] Loading schedule from Supabase into local simulation memory...")
+    # 1. Get Simulation "Current Date" from the Main Database
+    sim_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
+    sim_date <- as.Date(sim_timestamp)
+    
+    message(paste("[SYSTEM] Loading schedule. Aligning to simulation date:", sim_date))
+    
     initial_data <- load_supabase_table("bus_schedule")
     
     if (nrow(initial_data) > 0) {
-      # Ensure time format is usable
       if(inherits(initial_data$scheduled_departure, "character")) {
-         # Assuming format is HH:MM:SS, we prepend today's date for sorting
-         initial_data[, full_time := as.POSIXct(paste(Sys.Date(), scheduled_departure))]
+         initial_data[, full_time := as.POSIXct(paste(sim_date, scheduled_departure), tz="UTC")]
       } else {
-         initial_data[, full_time := scheduled_departure]
+         time_part <- format(initial_data$scheduled_departure, "%H:%M:%S")
+         initial_data[, full_time := as.POSIXct(paste(sim_date, time_part), tz="UTC")]
       }
       local_schedule(initial_data)
     }
@@ -133,7 +113,7 @@ server <- function(input, output, session) {
     }
   )
 
-  # --- 1. AUTHENTICATION & ROUTING ---
+  # --- AUTHENTICATION ---
   authenticated <- reactiveVal(FALSE)
   user_info <- reactiveVal(NULL)
   current_view <- reactiveVal("dashboard")
@@ -158,7 +138,7 @@ server <- function(input, output, session) {
   observeEvent(input$nav_selection, { current_view(input$nav_selection) })
   observeEvent(input$back_to_home, { current_view("dashboard") })
 
-  # --- 3. DASHBOARD CONTENT ---
+  # --- DASHBOARD CONTENT ---
   output$topbar_title_dynamic <- renderUI({ req(authenticated()); div(class = "topbar-title", "Smart Bus Management Platform") })
   output$dashboard_content <- renderUI({
     req(authenticated())
@@ -174,7 +154,7 @@ server <- function(input, output, session) {
     )
   })
 
-  # --- 4. MODULE SERVER LOGIC ---
+  # --- MODULE LOGIC ---
   observeEvent(input$chat_message, {
     req(input$chat_message$text, live_info())
     user_message <- input$chat_message$text
@@ -184,37 +164,36 @@ server <- function(input, output, session) {
     session$sendCustomMessage("chat_response", call_chatgpt(messages_to_send))
   })
   
-  # --- SCHEDULER MODULE LOGIC (UPDATED) ---
+  # --- SCHEDULER MODULE LOGIC (FIXED: Live Time Sync) ---
   
-  # 1. Render the 3-Column Schedule Table (Next 10 Departures)
   output$schedule_table <- DT::renderDataTable({
+    # CRITICAL: Depend on live_info() so this re-renders every time the DB updates
+    # This forces the 'current_sim_time' to refresh automatically
+    req(live_info()) 
     req(local_schedule())
     
     sched <- local_schedule()
     
-    # Filter for future trips only
-    current_time <- Sys.time()
-    future_sched <- sched[full_time > current_time][order(full_time)]
+    # 3. Use Database Timestamp as "Current Time" Proxy
+    current_sim_time <- get_latest_timestamp("SmartTransit_Integrated")
+    
+    # Filter for trips LATER than the database update time
+    future_sched <- sched[full_time > current_sim_time][order(full_time)]
     
     if(nrow(future_sched) == 0) return(NULL)
     
-    # Helper to get next 10 times for a route
     get_next_10 <- function(r_id) {
       times <- future_sched[route_id == r_id, head(format(full_time, "%H:%M"), 10)]
-      # Pad with empty strings if less than 10
       length(times) <- 10
       return(times)
     }
     
-    # Construct the display table
     display_df <- data.frame(
       "Route A" = get_next_10("A"),
       "Route B" = get_next_10("B"),
       "Route C" = get_next_10("C"),
       stringsAsFactors = FALSE
     )
-    
-    # Replace NAs with "--"
     display_df[is.na(display_df)] <- "--"
     
     DT::datatable(display_df, 
@@ -224,23 +203,19 @@ server <- function(input, output, session) {
     )
   })
 
-  # 2. AI Proposal Logic
   proposal_state <- reactiveValues(active = FALSE, route = NULL, time = NULL, reason = NULL)
   
   observeEvent(input$scan_system_btn, {
     routes_to_scan <- c("A", "B", "C")
     found_issue <- FALSE
-    
     for (r in routes_to_scan) {
       analysis <- get_route_crowding_profile(live_info(), r)
       if (is.null(analysis)) next
-      
       prompt <- list(
         list(role="system", content="You are an Operations AI. Check the profile. If recommendation is YES, output 'DECISION: YES | REASON: [Brief reason]'. If NO, output 'DECISION: NO'."),
         list(role="user", content=analysis$profile_text)
       )
       response <- call_chatgpt(prompt)
-      
       if (grepl("DECISION: YES", response)) {
         proposal_state$active <- TRUE
         proposal_state$route <- r
@@ -251,7 +226,6 @@ server <- function(input, output, session) {
         break 
       }
     }
-    
     if (!found_issue) {
       output$scheduler_ai_message <- renderUI({ div(class="status-optimal", icon("check"), " System Optimal. No additions needed.") })
       proposal_state$active <- FALSE
@@ -283,35 +257,35 @@ server <- function(input, output, session) {
     output$scheduler_ai_message <- renderUI({ "Suggestion dismissed." })
   })
   
-  # 3. Confirm Logic (UPDATED: Modifies Local Var Only)
   observeEvent(input$confirm_schedule_btn, {
     req(proposal_state$active, local_schedule())
     
-    # Create the new row
-    new_time_str <- proposal_state$time # Format HH:MM:SS
-    new_datetime <- as.POSIXct(paste(Sys.Date(), new_time_str))
+    # 4. Add trip using the SIMULATION DATE
+    sim_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
+    sim_date <- as.Date(sim_timestamp)
+    
+    new_time_str <- proposal_state$time
+    new_datetime <- as.POSIXct(paste(sim_date, new_time_str), tz="UTC")
     
     new_row <- data.table(
       route_id = proposal_state$route,
       scheduled_departure = new_time_str,
-      headway_min = 15, # Default value for inserted trip
+      headway_min = 15,
       full_time = new_datetime
     )
     
-    # Append to local schedule and re-sort
+    # Update local memory
     current <- local_schedule()
     updated <- rbind(current, new_row, fill = TRUE)
     updated <- updated[order(full_time)]
-    
-    # Update the reactive variable
     local_schedule(updated)
     
-    showNotification(paste("✅ [SIMULATION] Added Trip to Route", proposal_state$route, "at", proposal_state$time), type="message")
+    showNotification(paste("✅ Added Trip to Route", proposal_state$route, "at", proposal_state$time), type="message")
     proposal_state$active <- FALSE
     output$scheduler_ai_message <- renderUI({ "Action completed successfully (Local Update)." })
   })
 
-  # --- PLOT RENDERING ---
+  # --- PLOTS & KPIS ---
   output$summaryOutputPlot1 <- renderPlot({ current_data <- live_info(); req(current_data, exists("routes")); create_occupancy_box(current_data, routes) })
   output$summaryOutputPlot2 <- renderPlot({ current_data <- live_info(); req(current_data, exists("routes")); create_delay_jitter(current_data, routes) })
   output$summaryOutputPlot3 <- renderPlotly({ req(input$summaryplot3whatRoute); current_data <- live_info(); req(current_data, exists("routes")); create_crowding_pie(current_data, routes, input$summaryplot3whatRoute) })
