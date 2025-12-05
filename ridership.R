@@ -10,18 +10,7 @@ rider_ui <- function() {
     tags$head(
       tags$style(common_styles),
       tags$style(HTML("
-        .page-icon-banner { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 2rem 0; margin-bottom: 2rem; }
-        .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
-        .icon-item { text-align: center; color: white; transition: transform 0.3s ease; }
-        .icon-item:hover { transform: translateY(-5px); }
-        .icon-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.3); }
-        .icon-item.passengers .icon-circle { background: rgba(52, 152, 219, 0.9); }
-        .icon-item.trends .icon-circle { background: rgba(46, 204, 113, 0.9); }
-        .icon-item.daily .icon-circle { background: rgba(155, 89, 182, 0.9); }
-        .icon-item.peak .icon-circle { background: rgba(243, 156, 18, 0.9); }
-        .icon-label { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; }
-        .icon-description { font-size: 0.8rem; opacity: 0.9; line-height: 1.4; }
-        
+        /* Cleaned up CSS without banner styles */
         .ridership-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-bottom: 3rem; }
         .ridership-item { border-bottom: 1px solid #f0f0f0; padding-bottom: 2rem; }
         .ridership-full { border-bottom: 1px solid #f0f0f0; padding-bottom: 2rem; }
@@ -47,8 +36,6 @@ rider_ui <- function() {
         
         .btn-ai { flex: 1; padding: 0.75rem 1.2rem; background: transparent; color: #495057; border: 1px solid #dee2e6; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
         .btn-ai:hover { border-color: #adb5bd; }
-        .btn-add-trip { background: #2c3e50; color: white; border: 1px solid #2c3e50; }
-        .btn-add-trip:hover { border-color: #1a252f; }
         .btn-refresh { background: transparent; border: 1px solid #dee2e6; color: #495057; padding: 0.5rem 1rem; font-size: 0.85rem; transition: all 0.2s; }
         .btn-refresh:hover { border-color: #adb5bd; }
       "))
@@ -66,16 +53,7 @@ rider_ui <- function() {
         )
       ),
 
-      div(
-        class = "page-icon-banner",
-        div(
-          class = "icon-grid",
-          div(class = "icon-item passengers", div(class = "icon-circle", "👥"), div(class = "icon-label", "Passenger Count"), div(class = "icon-description", "Track total ridership")),
-          div(class = "icon-item trends", div(class = "icon-circle", "📈"), div(class = "icon-label", "Demand Trends"), div(class = "icon-description", "Analyze usage patterns")),
-          div(class = "icon-item daily", div(class = "icon-circle", "📅"), div(class = "icon-label", "Daily Statistics"), div(class = "icon-description", "View daily breakdowns")),
-          div(class = "icon-item peak", div(class = "icon-circle", "⏰"), div(class = "icon-label", "Peak Hours"), div(class = "icon-description", "Identify busy periods"))
-        )
-      ),
+      # REMOVED: Large Decorative Icon Banner
 
       div(
         class = "page-content",
@@ -99,14 +77,14 @@ rider_ui <- function() {
           div(class = "ai-section",
             div(
               class = "ai-header",
-              div(class = "ai-title", "AI Demand & Extra-Trip Recommendation"),
+              div(class = "ai-title", "AI Demand & Capacity Insight"),
               span()
             ),
             uiOutput("ai_ridership_display"),
             div(
               class = "ai-buttons",
-              actionButton("get_ridership_insight", "Generate AI Insight", class = "btn-ai"),
-              actionButton("add_ridership_trip_btn", "Add Trip to Route", class = "btn-ai btn-add-trip")
+              actionButton("get_ridership_insight", "Generate AI Insight", class = "btn-ai")
+              # REMOVED: "Add Trip" button (Now handled in Scheduler)
             )
           )
         ),

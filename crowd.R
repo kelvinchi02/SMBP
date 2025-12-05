@@ -15,18 +15,7 @@ crowd_ui <- function() {
     tags$head(
       tags$style(common_styles),
       tags$style(HTML("
-        .page-icon-banner { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 2rem 0; margin-bottom: 2rem; }
-        .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
-        .icon-item { text-align: center; color: white; transition: transform 0.3s ease; }
-        .icon-item:hover { transform: translateY(-5px); }
-        .icon-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.3); }
-        .icon-item.crowding .icon-circle { background: rgba(231, 76, 60, 0.9); }
-        .icon-item.capacity .icon-circle { background: rgba(52, 152, 219, 0.9); }
-        .icon-item.hotspots .icon-circle { background: rgba(243, 156, 18, 0.9); }
-        .icon-item.risk .icon-circle { background: rgba(155, 89, 182, 0.9); }
-        .icon-label { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; }
-        .icon-description { font-size: 0.8rem; opacity: 0.9; line-height: 1.4; }
-        
+        /* Cleaned up CSS */
         .crowd-grid { display: grid; grid-template-columns: 1fr; gap: 3rem; }
         .crowd-item { border-bottom: 1px solid #f0f0f0; padding-bottom: 2rem; }
         
@@ -58,8 +47,6 @@ crowd_ui <- function() {
         
         .btn-ai { flex: 1; padding: 0.75rem 1.2rem; background: transparent; color: #495057; border: 1px solid #dee2e6; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
         .btn-ai:hover { border-color: #adb5bd; }
-        .btn-add-trip { background: #2c3e50; color: white; border: 1px solid #2c3e50; }
-        .btn-add-trip:hover { border-color: #1a252f; }
         .btn-refresh { background: transparent; border: 1px solid #dee2e6; color: #495057; padding: 0.5rem 1rem; font-size: 0.85rem; transition: all 0.2s; }
         .btn-refresh:hover { border-color: #adb5bd; }
       "))
@@ -77,16 +64,7 @@ crowd_ui <- function() {
         )
       ),
 
-      div(
-        class = "page-icon-banner",
-        div(
-          class = "icon-grid",
-          div(class = "icon-item crowding", div(class = "icon-circle", "🚦"), div(class = "icon-label", "Crowding Level"), div(class = "icon-description", "Monitor crowd density")),
-          div(class = "icon-item capacity", div(class = "icon-circle", "📊"), div(class = "icon-label", "Vehicle Capacity"), div(class = "icon-description", "Track occupancy rates")),
-          div(class = "icon-item hotspots", div(class = "icon-circle", "📍"), div(class = "icon-label", "Crowded Areas"), div(class = "icon-description", "Identify congestion zones")),
-          div(class = "icon-item risk", div(class = "icon-circle", "⚡"), div(class = "icon-label", "Overload Risk"), div(class = "icon-description", "Prevent overcrowding"))
-        )
-      ),
+      # REMOVED: Large Decorative Icon Banner
 
       div(
         class = "page-content",
@@ -117,8 +95,8 @@ crowd_ui <- function() {
             uiOutput("ai_crowding_display"),
             div(
               class = "ai-buttons",
-              actionButton("get_crowding_insight", "Generate AI Insight", class = "btn-ai"),
-              actionButton("add_crowding_trip_btn", "Add Trip to Route", class = "btn-ai btn-add-trip")
+              actionButton("get_crowding_insight", "Generate AI Insight", class = "btn-ai")
+              # REMOVED: "Add Trip" button (Now handled in Scheduler)
             )
           )
         ),

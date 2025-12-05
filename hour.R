@@ -9,18 +9,7 @@ delay_ui <- function() {
     tags$head(
       tags$style(common_styles),
       tags$style(HTML("
-        .page-icon-banner { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem 0; margin-bottom: 2rem; }
-        .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
-        .icon-item { text-align: center; color: white; transition: transform 0.3s ease; }
-        .icon-item:hover { transform: translateY(-5px); }
-        .icon-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2rem; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.3); }
-        .icon-item.delay .icon-circle { background: rgba(231, 76, 60, 0.9); }
-        .icon-item.punctuality .icon-circle { background: rgba(46, 204, 113, 0.9); }
-        .icon-item.issues .icon-circle { background: rgba(243, 156, 18, 0.9); }
-        .icon-item.routes .icon-circle { background: rgba(52, 152, 219, 0.9); }
-        .icon-label { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; }
-        .icon-description { font-size: 0.8rem; opacity: 0.9; line-height: 1.4; }
-
+        /* Refined CSS for cleaner layout without the banner */
         .delay-grid { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 3rem; }
         .delay-item { border-bottom: 1px solid #f0f0f0; padding-bottom: 2rem; }
         .delay-controls { margin-bottom: 1.5rem; }
@@ -49,8 +38,6 @@ delay_ui <- function() {
         
         .btn-ai { flex: 1; padding: 0.75rem 1.2rem; background: transparent; color: #495057; border: 1px solid #dee2e6; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
         .btn-ai:hover { border-color: #adb5bd; }
-        .btn-add-trip { background: #2c3e50; color: white; border: 1px solid #2c3e50; }
-        .btn-add-trip:hover { border-color: #1a252f; }
         .btn-refresh { background: transparent; border: 1px solid #dee2e6; color: #495057; padding: 0.5rem 1rem; font-size: 0.85rem; transition: all 0.2s; }
         .btn-refresh:hover { border-color: #adb5bd; }
       "))
@@ -68,21 +55,12 @@ delay_ui <- function() {
         )
       ),
 
-      div(
-        class = "page-icon-banner",
-        div(
-          class = "icon-grid",
-          div(class = "icon-item delay", div(class = "icon-circle", "⏱️"), div(class = "icon-label", "Delay Tracking"), div(class = "icon-description", "Monitor real-time delays")),
-          div(class = "icon-item punctuality", div(class = "icon-circle", "✓"), div(class = "icon-label", "Punctuality Rate"), div(class = "icon-description", "Track on-time performance")),
-          div(class = "icon-item issues", div(class = "icon-circle", "⚠️"), div(class = "icon-label", "Problem Stops"), div(class = "icon-description", "Identify delay hotspots")),
-          div(class = "icon-item routes", div(class = "icon-circle", "🚌"), div(class = "icon-label", "Route Analysis"), div(class = "icon-description", "Analyze route performance"))
-        )
-      ),
+      # REMOVED: Large Decorative Icon Banner
 
       div(
         class = "page-content",
         
-        # Real-time Section (Server must render realtime_kpis and worst_stops_display)
+        # Real-time Section
         div(
           class = "page-section",
           div(class = "realtime-section",
@@ -96,7 +74,7 @@ delay_ui <- function() {
           )
         ),
         
-        # AI Section (Server must render ai_insight_display)
+        # AI Section
         div(
           class = "page-section",
           div(class = "ai-section",
@@ -108,8 +86,8 @@ delay_ui <- function() {
             uiOutput("ai_insight_display"),
             div(
               class = "ai-buttons",
-              actionButton("get_ai_insight", "Generate AI Insight", class = "btn-ai"),
-              actionButton("add_trip_btn", "Add Trip to Route", class = "btn-ai btn-add-trip")
+              actionButton("get_ai_insight", "Generate AI Insight", class = "btn-ai")
+              # REMOVED: "Add Trip" button (Now handled in Scheduler)
             )
           )
         ),
@@ -145,13 +123,10 @@ delay_ui <- function() {
 # -------------------------------------------------------------------------
 
 # FUNCTION 1: Hourly Schedule Adherence
-# Now accepts 'data' (live observations) and 'routes_ref' (static route metadata)
 create_hour_plot1 <- function(data, routes_ref) {
   
-  # Recalculate aggregation on live data
   hour.data <- data[delay_category != 'On-time', mean(delay_min), .(delay_category, route_id, hour)]
   
-  # Merge with route metadata for names and colors
   hour_plot_data <- merge(hour.data, routes_ref, by = "route_id")
 
   ggplot(hour_plot_data, aes(x = V1, y = route_name, color = delay_category)) +
@@ -180,9 +155,7 @@ create_hour_plot1 <- function(data, routes_ref) {
 }
 
 # FUNCTION 2: Distribution of Delays
-# Now accepts 'data' (live) and 'whatRoutine' (input selection)
 create_hour_plot2 <- function(data, whatRoutine) {
-  # Safety check: if user selects nothing, default to first route available in data
   if (is.null(whatRoutine)) whatRoutine <- unique(data$route_id)[1]
   
   ggplot(data[route_id == whatRoutine], aes(x = hour, y = delay_min)) +
