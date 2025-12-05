@@ -25,30 +25,27 @@ message(paste("[SYSTEM] Application startup initiated at:", startup_start))
 if (file.exists(".env")) load_dot_env(".env")
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
-# Source Modules
-safe_source <- function(f) {
-  message(">>> Sourcing: ", f)
-  tryCatch(
-    source(f, local = FALSE), # CHANGED to FALSE to ensure global visibility
-    error = function(e) {
-      message(">>> ERROR in ", f, ": ", e$message)
-      stop(e)
-    }
-  )
-}
+# Source Modules - Explicitly source files globally to avoid scope issues
+# Order matters: Utilities first, then UI modules, then Logic
+source("database_connection.R")
+source("pre.R")
+source("api_utils.R")
+source("styles.R")
 
-files <- c(
-  "database_connection.R", "pre.R", "api_utils.R", 
-  "dashboard.R", "login.R", "chat.R", 
-  "overview.R", "map.R", "weather.R", 
-  "crowd.R", "ridership.R", "hour.R", 
-  "scheduler.R", # ADDED: Scheduler UI module
-  "styles.R"
-)
+# UI Modules
+source("dashboard.R")
+source("login.R")
+source("chat.R")
+source("scheduler.R") # The new AI Scheduler module
 
-for (f in files) {
-  if(file.exists(f)) safe_source(f) else message("Warning: File not found: ", f)
-}
+# Analysis Modules
+source("overview.R")
+source("map.R")
+source("weather.R")
+source("crowd.R")
+source("ridership.R")
+source("hour.R")
+
 
 # Ensure image path exists
 if (dir.exists("www/index")) {
@@ -125,7 +122,12 @@ server <- function(input, output, session) {
   current_view <- reactiveVal("dashboard")
   
   output$root_ui <- renderUI({
-    if (!authenticated()) { login_ui() } else { tagList(dashboard_ui(user_name = user_info()$name), chat_ui()) }
+    if (!authenticated()) { 
+      login_ui() 
+    } else { 
+      # dashboard_ui and chat_ui are now guaranteed to be in global scope
+      tagList(dashboard_ui(user_name = user_info()$name), chat_ui()) 
+    }
   })
 
   # Login/Auth Observers
@@ -228,13 +230,13 @@ server <- function(input, output, session) {
   # B. Render Proposal Columns
   output$scheduler_proposal_card <- renderUI({
     if (proposal_state$active) {
-      div(
+      div(class="proposal-panel",
         div(class="prop-route-badge", paste("Route", proposal_state$route)),
         div(class="prop-time-large", proposal_state$time),
         div(class="prop-impact-text", "Optimized to reduce headway")
       )
     } else {
-      div(style="opacity: 0.5; margin-top: 20px;", h4("No Pending Proposals"))
+      div(class="proposal-panel", style="opacity: 0.5;", h4("No Pending Proposals"))
     }
   })
   
@@ -265,7 +267,9 @@ server <- function(input, output, session) {
   
   observeEvent(input$confirm_schedule_btn, {
     req(proposal_state$active)
+    # Write to DB
     add_new_trip_to_db(proposal_state$route) 
+    
     showNotification(paste("✅ Added Trip to Route", proposal_state$route, "at", proposal_state$time), type="message")
     proposal_state$active <- FALSE
     output$scheduler_ai_message <- renderUI({ div(class="ai-text-box", style="border-left-color: #28a745;", "Action completed successfully. Schedule updated.") })
