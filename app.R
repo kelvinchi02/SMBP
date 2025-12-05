@@ -81,7 +81,6 @@ server <- function(input, output, session) {
     
     if (nrow(initial_data) > 0) {
       # Ensure strict HH:MM:SS format for string comparison
-      # If it's a full datetime, extract time. If it's string, ensure zero-padding.
       if(inherits(initial_data$scheduled_departure, "POSIXt")) {
          initial_data[, scheduled_departure := format(scheduled_departure, "%H:%M:%S")]
       }
@@ -96,13 +95,26 @@ server <- function(input, output, session) {
     session = session,
     checkFunc = function() { get_latest_timestamp("SmartTransit_Integrated") },
     valueFunc = function() {
-      df <- load_supabase_table("SmartTransit_Integrated")
+      # Use copy() to prevent data.table reference warnings
+      df <- copy(load_supabase_table("SmartTransit_Integrated"))
+      
       if(inherits(df$scheduled_arrival, "character")) { df[, scheduled_arrival := lubridate::ymd_hms(scheduled_arrival)] }
+      
       df[, hour := lubridate::hour(scheduled_arrival)]
       df[, hour := factor(hour, levels = sort(unique(hour)))]
-      df[, delay_category := data.table::fcase(delay_min > 0, "Delayed", delay_min < 0, "Early", delay_min == 0, "On-time")]
+      
+      df[, delay_category := data.table::fcase(
+        delay_min > 0, "Delayed",
+        delay_min < 0, "Early",
+        delay_min == 0, "On-time"
+      )]
+      
       if (!"crowding_level" %in% names(df)) {
-        df[, crowding_level := data.table::fcase(occupancy_rate < 0.5, "Low", occupancy_rate < 0.85, "Medium", default = "High")]
+        df[, crowding_level := data.table::fcase(
+          occupancy_rate < 0.5, "Low",
+          occupancy_rate < 0.85, "Medium",
+          default = "High"
+        )]
       }
       return(df)
     }
@@ -159,7 +171,7 @@ server <- function(input, output, session) {
     session$sendCustomMessage("chat_response", call_chatgpt(messages_to_send))
   })
   
-  # --- SCHEDULER MODULE LOGIC (FIXED: TIME-ONLY COMPARISON) ---
+  # --- SCHEDULER MODULE LOGIC (FIXED: Time Format Crash) ---
   
   output$schedule_table <- DT::renderDataTable({
     # Forces re-run whenever database updates
@@ -169,17 +181,27 @@ server <- function(input, output, session) {
     sched <- local_schedule()
     
     # 1. Get Proxy Time from Database
-    # We strip the date and keep only "HH:MM:SS"
-    current_sim_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
+    raw_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
+    
+    # CRITICAL FIX: Ensure it is a POSIXct object before formatting
+    # If it came in as a string (from JSON), convert it first.
+    if (is.character(raw_timestamp)) {
+      # Attempt to parse standard ISO format
+      current_sim_timestamp <- as.POSIXct(raw_timestamp, format="%Y-%m-%dT%H:%M:%S", tz="UTC")
+      # Fallback if standard parsing fails (e.g. if format varies)
+      if (is.na(current_sim_timestamp)) {
+         current_sim_timestamp <- as.POSIXct(raw_timestamp, tz="UTC") 
+      }
+    } else {
+      current_sim_timestamp <- raw_timestamp
+    }
+    
     proxy_time_str <- format(current_sim_timestamp, "%H:%M:%S")
     
     message(paste("[SCHEDULER] Simulation Proxy Time (HH:MM:SS):", proxy_time_str))
     
-    # 2. Filter strictly by string comparison (Works for ISO times)
-    # "12:15:00" > "12:14:14" evaluates correctly
+    # 2. Filter strictly by string comparison
     future_sched <- sched[scheduled_departure > proxy_time_str]
-    
-    # Sort by time
     future_sched <- future_sched[order(scheduled_departure)]
     
     if(nrow(future_sched) == 0) return(NULL)
@@ -259,13 +281,12 @@ server <- function(input, output, session) {
     output$scheduler_ai_message <- renderUI({ "Suggestion dismissed." })
   })
   
-  # CONFIRM LOGIC (UPDATED: Simple String Insert)
+  # CONFIRM LOGIC (Simple String Insert)
   observeEvent(input$confirm_schedule_btn, {
     req(proposal_state$active, local_schedule())
     
-    new_time_str <- proposal_state$time # Already in HH:MM:SS format
+    new_time_str <- proposal_state$time 
     
-    # Simply add the row. Date does not matter.
     new_row <- data.table(
       route_id = proposal_state$route,
       scheduled_departure = new_time_str,
@@ -274,10 +295,7 @@ server <- function(input, output, session) {
     
     current <- local_schedule()
     updated <- rbind(current, new_row, fill = TRUE)
-    
-    # Re-sort string-wise ("06:00" comes before "12:00")
     updated <- updated[order(scheduled_departure)]
-    
     local_schedule(updated)
     
     showNotification(paste("✅ Added Trip to Route", proposal_state$route, "at", proposal_state$time), type="message")
