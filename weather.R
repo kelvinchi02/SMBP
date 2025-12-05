@@ -102,23 +102,7 @@ weather_ui <- function() {
           )
         ),
         
-        # AI Advice Section
-        div(
-          class = "page-section",
-          div(class = "ai-section",
-            div(
-              class = "ai-header",
-              div(class = "ai-title", "AI Weather-Based Operations Advice"),
-              span()
-            ),
-            uiOutput("ai_weather_display"),
-            div(
-              class = "ai-buttons",
-              actionButton("get_weather_insight", "Generate AI Insight", class = "btn-ai"),
-              actionButton("add_weather_trip_btn", "Add Trip to Routes", class = "btn-ai btn-add-trip")
-            )
-          )
-        ),
+
         
         # Charts Section
         div(

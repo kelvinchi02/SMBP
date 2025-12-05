@@ -93,23 +93,7 @@ rider_ui <- function() {
           )
         ),
         
-        # AI Section
-        div(
-          class = "page-section",
-          div(class = "ai-section",
-            div(
-              class = "ai-header",
-              div(class = "ai-title", "AI Demand & Extra-Trip Recommendation"),
-              span()
-            ),
-            uiOutput("ai_ridership_display"),
-            div(
-              class = "ai-buttons",
-              actionButton("get_ridership_insight", "Generate AI Insight", class = "btn-ai"),
-              actionButton("add_ridership_trip_btn", "Add Trip to Route", class = "btn-ai btn-add-trip")
-            )
-          )
-        ),
+
         
         # Trend Plot
         div(

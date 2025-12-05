@@ -96,24 +96,7 @@ delay_ui <- function() {
           )
         ),
         
-        # AI Section (Server must render ai_insight_display)
-        div(
-          class = "page-section",
-          div(class = "ai-section",
-            div(
-              class = "ai-header",
-              div(class = "ai-title", "AI Delay & Wait-Time Insight"),
-              span()
-            ),
-            uiOutput("ai_insight_display"),
-            div(
-              class = "ai-buttons",
-              actionButton("get_ai_insight", "Generate AI Insight", class = "btn-ai"),
-              actionButton("add_trip_btn", "Add Trip to Route", class = "btn-ai btn-add-trip")
-            )
-          )
-        ),
-        
+
         # Plot Section
         div(
           class = "page-section",
