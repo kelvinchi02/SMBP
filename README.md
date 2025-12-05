@@ -63,6 +63,10 @@ Generative AI features are powered by the Groq API, utilizing the `llama-3.1-8b-
 
 ## Technical Architecture
 
+> For detailed architectural diagrams and logic flows, see the [Technical Manual](TECHNICAL_MANUAL.md).
+
+The project is modularized for maintainability:
+...
 The project is modularized for maintainability:
 
 | Module | Description | Key Libraries |
