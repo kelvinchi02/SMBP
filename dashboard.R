@@ -57,6 +57,10 @@ dashboard_ui <- function(user_name = "Administrator") {
         div(class = "sidebar-menu", id = "sidebar-menu",
           div(class = "menu-item active", id = "menu-dashboard", onclick = "Shiny.setInputValue('nav_selection', 'dashboard', {priority: 'event'}); updateActiveMenu('dashboard');", bs_icon("house-fill"), span(class="menu-item-text", "Dashboard")),
           div(class = "menu-item", id = "menu-overview", onclick = "Shiny.setInputValue('nav_selection', 'overview', {priority: 'event'}); updateActiveMenu('overview');", bs_icon("clipboard-data-fill"), span(class="menu-item-text", "Overview")),
+          
+          # NEW: AI Scheduling Tab
+          div(class = "menu-item", id = "menu-scheduler", onclick = "Shiny.setInputValue('nav_selection', 'scheduler', {priority: 'event'}); updateActiveMenu('scheduler');", bs_icon("robot"), span(class="menu-item-text", "AI Scheduling")),
+          
           div(class = "menu-item", id = "menu-delay", onclick = "Shiny.setInputValue('nav_selection', 'delay', {priority: 'event'}); updateActiveMenu('delay');", bs_icon("clock-history"), span(class="menu-item-text", "Delay & Punctuality")),
           div(class = "menu-item", id = "menu-ridership", onclick = "Shiny.setInputValue('nav_selection', 'ridership', {priority: 'event'}); updateActiveMenu('ridership');", bs_icon("graph-up-arrow"), span(class="menu-item-text", "Ridership Trends")),
           div(class = "menu-item", id = "menu-crowding", onclick = "Shiny.setInputValue('nav_selection', 'crowding', {priority: 'event'}); updateActiveMenu('crowding');", bs_icon("people-fill"), span(class="menu-item-text", "Crowding Analysis")),

@@ -293,3 +293,104 @@ get_live_kpi_summary <- function(data) {
   
   return(summary_string)
 }
+
+
+
+# --- 8. SCHEDULE MANAGEMENT (NEW) ---
+
+get_next_scheduled_trip <- function(route_id_target, simulation_time) {
+  supabase_url <- Sys.getenv("SUPABASE_URL")
+  supabase_key <- Sys.getenv("SUPABASE_KEY")
+  
+  if (supabase_url == "" || supabase_key == "") return(NULL)
+  
+  # Format simulation time for query: HH:MM:SS
+  sim_time_str <- format(simulation_time, "%H:%M:%S")
+  
+  # Query: route_id = target AND scheduled_departure > sim_time
+  endpoint <- paste0(supabase_url, "/rest/v1/bus_schedule",
+                     "?route_id=eq.", route_id_target,
+                     "&scheduled_departure=gt.", sim_time_str,
+                     "&order=scheduled_departure.asc&limit=1")
+  
+  tryCatch({
+    req <- request(endpoint) |>
+      req_headers(apikey = supabase_key, Authorization = paste("Bearer", supabase_key))
+    
+    resp <- req_perform(req)
+    result <- resp_body_json(resp, simplifyVector = TRUE)
+    
+    if (length(result) > 0) {
+      return(list(
+        next_departure = result$scheduled_departure[1],
+        headway = result$headway_min[1]
+      ))
+    } else {
+      return(NULL)
+    }
+  }, error = function(e) {
+    return(NULL)
+  })
+}
+
+calculate_smart_insert_time <- function(next_sched, current_simulation_time) {
+  # S (Next Schedule)
+  s_time <- as.POSIXct(paste(Sys.Date(), next_sched$next_departure), format="%Y-%m-%d %H:%M:%S")
+  
+  # S-1 (Prev Schedule) = S - Headway
+  headway_sec <- next_sched$headway * 60
+  
+  # Calculate Midpoint (Insertion Point) = S - (Headway / 2)
+  half_gap <- headway_sec / 2
+  insert_time <- s_time - half_gap
+  
+  # Robustness: If calculated insertion time is already passed in the simulation,
+  # we suggest inserting in the NEXT interval (S + Headway/2).
+  if (insert_time < current_simulation_time) {
+     insert_time <- s_time + half_gap 
+  }
+  
+  return(format(insert_time, "%H:%M:%S"))
+}
+
+# --- 9. AI ROUTE PROFILING (NEW) ---
+
+get_route_crowding_profile <- function(live_data, route_id_target) {
+  route_data <- live_data[route_id == route_id_target]
+  
+  if (nrow(route_data) == 0) {
+    return(NULL)
+  }
+  
+  # 1. Determine Simulation Time (Latest update in data)
+  sim_time <- max(route_data$actual_arrival, na.rm = TRUE)
+  
+  # 2. Metrics (Last 2 records for trend)
+  recent_data <- tail(route_data[order(actual_arrival)], 2)
+  
+  avg_occ <- mean(recent_data$occupancy_rate, na.rm = TRUE)
+  max_waiting <- max(recent_data$passengers_waiting, na.rm = TRUE)
+  avg_delay <- mean(recent_data$delay_min, na.rm = TRUE)
+  
+  # 3. Schedule Context
+  next_schedule <- get_next_scheduled_trip(route_id_target, sim_time)
+  schedule_info <- "No schedule data."
+  suggested_insert <- "N/A"
+  
+  if (!is.null(next_schedule)) {
+    suggested_insert <- calculate_smart_insert_time(next_schedule, sim_time)
+    schedule_info <- paste0("Next Bus: ", next_schedule$next_departure, " (Headway: ", next_schedule$headway, "m)")
+  }
+  
+  # 4. Construct Profile
+  profile <- paste0(
+    "ROUTE: ", route_id_target, "\n",
+    "TIME: ", format(sim_time, "%H:%M:%S"), "\n",
+    "METRICS: Occupancy=", scales::percent(avg_occ, 1), ", MaxWaiting=", max_waiting, ", Delay=", round(avg_delay, 1), "m.\n",
+    "SCHEDULE: ", schedule_info, "\n",
+    "POTENTIAL INSERT: ", suggested_insert, "\n",
+    "TASK: If Occupancy > 85% OR MaxWaiting > 5, recommend YES. Else NO."
+  )
+  
+  return(list(profile_text = profile, suggested_time = suggested_insert))
+}

@@ -283,6 +283,92 @@ server <- function(input, output, session) {
     output$ai_ridership_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
   })
   
+
+
+  # --- SCHEDULER MODULE LOGIC ---
+  
+  # Reactive values for the proposal state
+  proposal_state <- reactiveValues(active = FALSE, route = NULL, time = NULL, reason = NULL)
+  
+  observeEvent(input$scan_system_btn, {
+    # 1. Scan Routes A, B, C sequentially
+    routes_to_scan <- c("A", "B", "C")
+    found_issue <- FALSE
+    
+    for (r in routes_to_scan) {
+      analysis <- get_route_crowding_profile(live_info(), r)
+      if (is.null(analysis)) next
+      
+      # Ask AI
+      prompt <- list(
+        list(role="system", content="You are an Operations AI. Check the profile. If recommendation is YES, output 'DECISION: YES | REASON: [Brief reason]'. If NO, output 'DECISION: NO'."),
+        list(role="user", content=analysis$profile_text)
+      )
+      response <- call_chatgpt(prompt)
+      
+      if (grepl("DECISION: YES", response)) {
+        # Found an issue! Populate proposal and stop scanning.
+        proposal_state$active <- TRUE
+        proposal_state$route <- r
+        proposal_state$time <- analysis$suggested_time
+        proposal_state$reason <- sub(".*REASON:", "", response)
+        
+        output$scheduler_ai_message <- renderUI({ 
+          div(strong(paste("Issue Detected on Route", r)), br(), trimws(proposal_state$reason)) 
+        })
+        found_issue <- TRUE
+        break 
+      }
+    }
+    
+    if (!found_issue) {
+      output$scheduler_ai_message <- renderUI({ div(class="status-optimal", icon("check"), " System Optimal. No additions needed.") })
+      proposal_state$active <- FALSE
+    }
+  })
+  
+  # Render Proposal Card
+  output$scheduler_proposal_card <- renderUI({
+    if (proposal_state$active) {
+      div(class="proposal-card",
+        div(class="proposal-route", paste("Add Trip to Route", proposal_state$route)),
+        div(class="proposal-time", proposal_state$time),
+        div(class="proposal-impact", "Fills schedule gap to reduce crowding")
+      )
+    } else {
+      div(class="proposal-card", style="opacity: 0.5;", h4("No Pending Proposals"))
+    }
+  })
+  
+  # Render Confirm Button (Active/Disabled)
+  output$scheduler_confirm_btn_ui <- renderUI({
+    if (proposal_state$active) {
+      actionButton("confirm_schedule_btn", "Confirm & Add Schedule", class = "btn-confirm", icon = icon("plus"))
+    } else {
+      actionButton("disabled_btn", "Confirm & Add Schedule", class = "btn-confirm btn-disabled", disabled = TRUE)
+    }
+  })
+  
+  # Dismiss Action
+  observeEvent(input$dismiss_proposal_btn, {
+    proposal_state$active <- FALSE
+    output$scheduler_ai_message <- renderUI({ "Suggestion dismissed." })
+  })
+  
+  # Confirm Action
+  observeEvent(input$confirm_schedule_btn, {
+    req(proposal_state$active)
+    # Write to DB
+    # We need a slight mod to add_new_trip_to_db to accept a specific time if possible, 
+    # otherwise it defaults to NOW. For MVP, we just trigger the function.
+    add_new_trip_to_db(proposal_state$route) 
+    
+    showNotification(paste("✅ Added Trip to Route", proposal_state$route, "at", proposal_state$time), type="message")
+    proposal_state$active <- FALSE
+    output$scheduler_ai_message <- renderUI({ "Action completed successfully." })
+  })
+
+
   # -----------------------------------------------------------------------
   # DASHBOARD PLOT RENDERING
   # -----------------------------------------------------------------------
