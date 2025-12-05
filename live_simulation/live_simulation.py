@@ -15,7 +15,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 TABLE_NAME = "SmartTransit_Integrated"
 CSV_FILE = "live_simulation/live_data.csv"  # File path confirmed
 BATCH_SIZE = 3
-DELAY_SECONDS = 3
+DELAY_SECONDS = 8
 CLEANUP_DELAY_SECONDS = 5 
 
 # ----------------------------------------------------------------------------------

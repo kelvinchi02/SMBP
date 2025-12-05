@@ -155,7 +155,7 @@ server <- function(input, output, session) {
   observeEvent(input$chat_message, {
     req(input$chat_message$text, live_info())
     user_message <- input$chat_message$text
-    system_persona <- list(role = "system", content = "You are the Smart Transit AI Assistant. Analyze the current live data provided. Provide concise, data-driven answers.")
+    system_persona <- list(role = "system", content = "You are the Smart Transit AI Assistant. Analyze the current live data provided. Provide concise, certain and data-driven answers.")
     live_context <- list(role = "system", content = paste0("CURRENT LIVE SYSTEM STATUS:\n", get_live_kpi_summary(live_info())))
     messages_to_send <- list(system_persona, live_context, list(role = "user", content = user_message))
     session$sendCustomMessage("chat_response", call_chatgpt(messages_to_send))
@@ -220,7 +220,18 @@ server <- function(input, output, session) {
       
       # Strict prompt for boolean logic
       prompt <- list(
-        list(role="system", content="You are an Operations AI. Analyze metrics against these strict rules:\n1. Occupancy > 85%\n2. Delay > 10 min\n3. MaxWaiting > 5\n\nIf ANY condition is met, output 'DECISION: YES | REASON: [Constraint violated]'. If NONE are met, output 'DECISION: NO'."),
+        list(role="system", content=paste0(
+          "You are an Operations AI. Analyze metrics against these strict rules:\n",
+          "1. Occupancy > 85%\n",
+          "2. Delay > 10 min\n",
+          "3. MaxWaiting > 5\n\n",
+          "If ANY condition is met, output 'DECISION: YES | REASON: [User-friendly explanation including the specific numeric value]'.\n\n",
+          "Examples of good output formats:\n",
+          "- 'DECISION: YES | REASON: Overcrowded with occupancy at 92%'\n",
+          "- 'DECISION: YES | REASON: Severe traffic causing delays of 14 minutes'\n",
+          "- 'DECISION: YES | REASON: Station bottleneck with 8 passengers waiting'\n\n",
+          "If NONE are met, output 'DECISION: NO'."
+        )),
         list(role="user", content=analysis$profile_text)
       )
       
