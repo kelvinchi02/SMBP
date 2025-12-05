@@ -76,21 +76,16 @@ server <- function(input, output, session) {
   observe({
     req(is.null(isolate(local_schedule())) || nrow(isolate(local_schedule())) == 0)
     
-    # 1. Get Simulation "Current Date" from the Main Database
-    sim_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
-    sim_date <- as.Date(sim_timestamp)
-    
-    message(paste("[SYSTEM] Loading schedule. Aligning to simulation date:", sim_date))
-    
+    message("[SYSTEM] Loading schedule (Time-Only Mode)...")
     initial_data <- load_supabase_table("bus_schedule")
     
     if (nrow(initial_data) > 0) {
-      if(inherits(initial_data$scheduled_departure, "character")) {
-         initial_data[, full_time := as.POSIXct(paste(sim_date, scheduled_departure), tz="UTC")]
-      } else {
-         time_part <- format(initial_data$scheduled_departure, "%H:%M:%S")
-         initial_data[, full_time := as.POSIXct(paste(sim_date, time_part), tz="UTC")]
+      # Ensure strict HH:MM:SS format for string comparison
+      # If it's a full datetime, extract time. If it's string, ensure zero-padding.
+      if(inherits(initial_data$scheduled_departure, "POSIXt")) {
+         initial_data[, scheduled_departure := format(scheduled_departure, "%H:%M:%S")]
       }
+      # Store just the raw table. We will filter dynamically in the render function.
       local_schedule(initial_data)
     }
   })
@@ -164,7 +159,7 @@ server <- function(input, output, session) {
     session$sendCustomMessage("chat_response", call_chatgpt(messages_to_send))
   })
   
-  # --- SCHEDULER MODULE LOGIC (LOGGING ADDED) ---
+  # --- SCHEDULER MODULE LOGIC (FIXED: TIME-ONLY COMPARISON) ---
   
   output$schedule_table <- DT::renderDataTable({
     # Forces re-run whenever database updates
@@ -173,20 +168,24 @@ server <- function(input, output, session) {
     
     sched <- local_schedule()
     
-    # 3. Use Database Timestamp as "Current Time" Proxy
-    current_sim_time <- get_latest_timestamp("SmartTransit_Integrated")
+    # 1. Get Proxy Time from Database
+    # We strip the date and keep only "HH:MM:SS"
+    current_sim_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
+    proxy_time_str <- format(current_sim_timestamp, "%H:%M:%S")
     
-    # --- LOGGING TO CONSOLE ---
-    message(paste("[SCHEDULER] Simulation Proxy Time:", current_sim_time))
-    # --------------------------
+    message(paste("[SCHEDULER] Simulation Proxy Time (HH:MM:SS):", proxy_time_str))
     
-    # Filter for trips LATER than the database update time
-    future_sched <- sched[full_time > current_sim_time][order(full_time)]
+    # 2. Filter strictly by string comparison (Works for ISO times)
+    # "12:15:00" > "12:14:14" evaluates correctly
+    future_sched <- sched[scheduled_departure > proxy_time_str]
+    
+    # Sort by time
+    future_sched <- future_sched[order(scheduled_departure)]
     
     if(nrow(future_sched) == 0) return(NULL)
     
     get_next_10 <- function(r_id) {
-      times <- future_sched[route_id == r_id, head(format(full_time, "%H:%M"), 10)]
+      times <- future_sched[route_id == r_id, head(scheduled_departure, 10)]
       length(times) <- 10
       return(times)
     }
@@ -260,27 +259,25 @@ server <- function(input, output, session) {
     output$scheduler_ai_message <- renderUI({ "Suggestion dismissed." })
   })
   
+  # CONFIRM LOGIC (UPDATED: Simple String Insert)
   observeEvent(input$confirm_schedule_btn, {
     req(proposal_state$active, local_schedule())
     
-    # 4. Add trip using the SIMULATION DATE
-    sim_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
-    sim_date <- as.Date(sim_timestamp)
+    new_time_str <- proposal_state$time # Already in HH:MM:SS format
     
-    new_time_str <- proposal_state$time
-    new_datetime <- as.POSIXct(paste(sim_date, new_time_str), tz="UTC")
-    
+    # Simply add the row. Date does not matter.
     new_row <- data.table(
       route_id = proposal_state$route,
       scheduled_departure = new_time_str,
-      headway_min = 15,
-      full_time = new_datetime
+      headway_min = 15
     )
     
-    # Update local memory
     current <- local_schedule()
     updated <- rbind(current, new_row, fill = TRUE)
-    updated <- updated[order(full_time)]
+    
+    # Re-sort string-wise ("06:00" comes before "12:00")
+    updated <- updated[order(scheduled_departure)]
+    
     local_schedule(updated)
     
     showNotification(paste("✅ Added Trip to Route", proposal_state$route, "at", proposal_state$time), type="message")
