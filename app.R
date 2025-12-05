@@ -30,6 +30,7 @@ source("database_connection.R")
 source("pre.R")  
 source("api_utils.R")
 source("dashboard.R")
+source("scheduler.R") # NEW: Source the scheduler module
 source("login.R")
 source("chat.R")
 source("overview.R")
@@ -197,6 +198,7 @@ server <- function(input, output, session) {
     switch(current_view(),
       "dashboard" = dashboard_home_content(),
       "overview" = overview_ui(),
+      "scheduler" = scheduler_ui(), # NEW: AI Scheduling Tab
       "delay" = delay_ui(),
       "ridership" = rider_ui(),
       "crowding" = crowd_ui(),
@@ -240,51 +242,6 @@ server <- function(input, output, session) {
     session$sendCustomMessage("chat_response", ai_response)
   })
   
-  # --- OPERATIONAL ACTIONS (WRITE-BACK) ---
-  observeEvent(input$add_ridership_trip_btn, {
-    result <- add_ridership_trip("B", 10, 5000, 1) 
-    if (is.null(result$error)) {
-      showNotification(paste(result$message, "New Headway:", result$new_headway, "min"), type = "message")
-    } else {
-      showNotification(paste("Failed:", result$error), type = "error")
-    }
-  })
-  
-  observeEvent(input$add_crowding_trip_btn, {
-    result <- add_crowding_trip("A", 12, 0.9, 1) 
-    if (is.null(result$error)) {
-      showNotification(paste(result$message, "Occupancy Reduction:", result$occupancy_reduction*100, "%"), type = "message")
-    } else {
-      showNotification(paste("Failed:", result$error), type = "error")
-    }
-  })
-  
-  # -----------------------------------------------------------------------
-  # AI INSIGHT LOGIC
-  # -----------------------------------------------------------------------
-  observeEvent(input$get_ai_insight, { 
-    data <- generate_ai_delay_summary()
-    output$ai_insight_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  observeEvent(input$get_stop_insight, {
-    data <- get_ai_stop_summary()
-    output$ai_stop_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data$analysis))) })
-  })
-  observeEvent(input$get_weather_insight, {
-    data <- generate_ai_weather_summary()
-    output$ai_weather_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  observeEvent(input$get_crowding_insight, {
-    data <- generate_ai_crowding_summary()
-    output$ai_crowding_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  observeEvent(input$get_ridership_insight, {
-    data <- generate_ai_ridership_summary()
-    output$ai_ridership_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
-  })
-  
-
-
   # --- SCHEDULER MODULE LOGIC ---
   
   # Reactive values for the proposal state
@@ -367,8 +324,50 @@ server <- function(input, output, session) {
     proposal_state$active <- FALSE
     output$scheduler_ai_message <- renderUI({ "Action completed successfully." })
   })
-
-
+  
+  # --- OPERATIONAL ACTIONS (WRITE-BACK) ---
+  observeEvent(input$add_ridership_trip_btn, {
+    result <- add_ridership_trip("B", 10, 5000, 1) 
+    if (is.null(result$error)) {
+      showNotification(paste(result$message, "New Headway:", result$new_headway, "min"), type = "message")
+    } else {
+      showNotification(paste("Failed:", result$error), type = "error")
+    }
+  })
+  
+  observeEvent(input$add_crowding_trip_btn, {
+    result <- add_crowding_trip("A", 12, 0.9, 1) 
+    if (is.null(result$error)) {
+      showNotification(paste(result$message, "Occupancy Reduction:", result$occupancy_reduction*100, "%"), type = "message")
+    } else {
+      showNotification(paste("Failed:", result$error), type = "error")
+    }
+  })
+  
+  # -----------------------------------------------------------------------
+  # AI INSIGHT LOGIC
+  # -----------------------------------------------------------------------
+  observeEvent(input$get_ai_insight, { 
+    data <- generate_ai_delay_summary()
+    output$ai_insight_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
+  })
+  observeEvent(input$get_stop_insight, {
+    data <- get_ai_stop_summary()
+    output$ai_stop_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data$analysis))) })
+  })
+  observeEvent(input$get_weather_insight, {
+    data <- generate_ai_weather_summary()
+    output$ai_weather_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
+  })
+  observeEvent(input$get_crowding_insight, {
+    data <- generate_ai_crowding_summary()
+    output$ai_crowding_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
+  })
+  observeEvent(input$get_ridership_insight, {
+    data <- generate_ai_ridership_summary()
+    output$ai_ridership_display <- renderUI({ div(class="ai-suggestion", HTML(paste0("<strong>AI:</strong> ", data))) })
+  })
+  
   # -----------------------------------------------------------------------
   # DASHBOARD PLOT RENDERING
   # -----------------------------------------------------------------------
@@ -409,7 +408,7 @@ server <- function(input, output, session) {
         addCircleMarkers(lng = lons, lat = lats, group = "vehicles", radius = 10, color = "black", weight = 2, opacity = 1,
           fillColor = ifelse(status == "Delayed", "#E74C3C", "#2ECC71"), fillOpacity = 1.0,
           popup = paste0("<b>Bus:</b> ", ids, "<br><b>Status:</b> ", status))
-      if(input$refresh_live_map > 2) { showNotification(paste("Synced", length(live_data$vehicles), "vehicles"), duration = 2) }
+      if(input$refresh_live_map > 0) { showNotification(paste("Synced", length(live_data$vehicles), "vehicles"), duration = 2) }
     }
   })
 }
