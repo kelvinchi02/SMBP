@@ -12,7 +12,7 @@ call_chatgpt <- function(messages_list, api_key = NULL, max_retries = 3) {
   GROQ_ENDPOINT <- "https://api.groq.com/openai/v1/chat/completions"
   GROQ_API_KEY <- Sys.getenv("GROQ_API_KEY")
   
-  # Use the model ID you want to test
+  # Valid Model ID
   MODEL_NAME <- "llama-3.1-8b-instant" 
   
   if (is.null(GROQ_API_KEY) || GROQ_API_KEY == "") {
@@ -20,9 +20,11 @@ call_chatgpt <- function(messages_list, api_key = NULL, max_retries = 3) {
   }
 
   # --- Request Body Construction ---
+  # CRITICAL FIX: wrapping messages_list in unname() ensures it becomes a JSON Array [ ... ]
+  # instead of a JSON Object { "1": ... }
   body <- list(
     model = MODEL_NAME,
-    messages = messages_list,
+    messages = unname(messages_list), 
     max_tokens = 1024,
     temperature = 1.0,
     top_p = 1.0,
@@ -43,34 +45,29 @@ call_chatgpt <- function(messages_list, api_key = NULL, max_retries = 3) {
           "Authorization" = paste("Bearer", GROQ_API_KEY),
           "Content-Type" = "application/json"
         ) |>
-        req_body_json(body) |>
+        req_body_json(body, auto_unbox = TRUE) |>
         req_timeout(30)
         
-      # Perform request
       resp <- req_perform(req)
       
       # >>> DEBUG: Print Raw Response Status <<<
       message(paste("--- [DEBUG] RESPONSE STATUS:", resp_status(resp), "---"))
-      # >>> END DEBUG <<<
 
-      # Check HTTP status code
       if (resp_status(resp) != 200) {
-        # Print the error body for debugging
         err_body <- resp_body_string(resp)
         message(paste("--- [DEBUG] ERROR BODY:", err_body))
         stop(paste("HTTP Error:", resp_status(resp), err_body))
       }
       
-      # Parse response JSON
       result <- resp_body_json(resp, simplifyVector = TRUE)
       
       # >>> DEBUG: Print Raw Response Body (Truncated) <<<
       message("--- [DEBUG] RAW RESPONSE (First 500 chars) ---")
       print(substr(toJSON(result, auto_unbox=TRUE), 1, 500))
       message("----------------------------------------------\n")
-      # >>> END DEBUG <<<
       
       if (length(result$choices) > 0) {
+        # Robust content extraction
         content <- if(is.data.frame(result$choices)) {
           result$choices$message$content[1]
         } else {
