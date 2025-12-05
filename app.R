@@ -94,7 +94,7 @@ server <- function(input, output, session) {
 
   # --- 0.1 AUTO-REFRESH LOGIC (LIVE BUS DATA) ---
   live_info <- reactivePoll(
-    intervalMillis = 5000,
+    intervalMillis = 15000,
     session = session,
     checkFunc = function() { get_latest_timestamp("SmartTransit_Integrated") },
     valueFunc = function() {
@@ -202,7 +202,7 @@ server <- function(input, output, session) {
   proposal_state <- reactiveValues(active = FALSE, route = NULL, time = NULL, reason = NULL)
   
   # AUTO-SCANNER
-  auto_scan_timer <- reactiveTimer(30000) 
+  auto_scan_timer <- reactiveTimer(60000) 
   
   observe({
     auto_scan_timer()
