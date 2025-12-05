@@ -25,7 +25,7 @@ message(paste("[SYSTEM] Application startup initiated at:", startup_start))
 if (file.exists(".env")) load_dot_env(".env")
 OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
-# Source Modules (UI and Function definitions)
+# Source Modules
 source("database_connection.R")
 source("pre.R")  
 source("api_utils.R")
@@ -51,7 +51,6 @@ if (dir.exists("www/index")) {
 ui <- page_fluid(
   style = "padding: 0; margin: 0;",
   
-  # JavaScript for session restoration and error handling
   tags$head(
     tags$script(HTML("
       $(document).on('shiny:connected', function() {
@@ -85,14 +84,14 @@ message(sprintf("[SYSTEM] UI definition complete. Total setup time: %s seconds",
 
 
 # -------------------------------------------------------------------------
-# 3. SERVER LOGIC (COMBINED)
+# 3. SERVER LOGIC
 # -------------------------------------------------------------------------
 server <- function(input, output, session) {
   
   message("[SERVER] Client connected. Session started.")
   
   # -----------------------------------------------------------------------
-  # 0. AUTO-REFRESH LOGIC (Reactive Polling)
+  # 0. AUTO-REFRESH LOGIC
   # -----------------------------------------------------------------------
   
   live_info <- reactivePoll(
@@ -108,7 +107,6 @@ server <- function(input, output, session) {
       
       df <- load_supabase_table("SmartTransit_Integrated")
       
-      # Data Cleaning (as defined in server.R's valueFunc)
       if(inherits(df$scheduled_arrival, "character")) {
         df[, scheduled_arrival := lubridate::ymd_hms(scheduled_arrival)]
       }
@@ -122,12 +120,14 @@ server <- function(input, output, session) {
         delay_min == 0, "On-time"
       )]
       
-      # CRITICAL: Calculate crowding_level on the fly for use in KPI summarization
-      df[, crowding_level := data.table::fcase(
-         occupancy_rate < 0.5, "Low",
-         occupancy_rate < 0.85, "Medium",
-         default = "High"
-      )]
+      # Ensure crowding_level exists for KPIs
+      if (!"crowding_level" %in% names(df)) {
+        df[, crowding_level := data.table::fcase(
+           occupancy_rate < 0.5, "Low",
+           occupancy_rate < 0.85, "Medium",
+           default = "High"
+        )]
+      }
       
       return(df)
     }
@@ -140,7 +140,7 @@ server <- function(input, output, session) {
   
   # --- 2. CONVERSATION HISTORY & STATE (NEW) ---
   
-  # Max history: 1 system persona + N conversation pairs. We limit pairs to 10.
+  # Max history: 1 system persona + 10 conversation pairs
   MAX_HISTORY_PAIRS <- 10 
   
   # Initialize with the permanent system persona prompt
@@ -178,7 +178,7 @@ server <- function(input, output, session) {
     }
   })
 
-  # Auto-login
+  # Auto-login & Logout
   observeEvent(input$restore_session, {
     tryCatch({
       user_data <- jsonlite::fromJSON(input$restore_session)
@@ -189,7 +189,6 @@ server <- function(input, output, session) {
     }, error = function(e) { session$sendCustomMessage("clearStorage", list()) })
   })
 
-  # Logout
   observeEvent(input$logout_btn, {
     authenticated(FALSE)
     user_info(NULL)
@@ -197,7 +196,6 @@ server <- function(input, output, session) {
     session$sendCustomMessage("clearStorage", list())
   })
 
-  # Navigation
   observeEvent(input$nav_selection, { current_view(input$nav_selection) })
   observeEvent(input$back_to_home, { current_view("dashboard") })
 
@@ -237,6 +235,7 @@ server <- function(input, output, session) {
     }
 
     # 3. Generate Live Data Context Message (Part 2)
+    # NOTE: Relies on api_utils.R containing the get_live_kpi_summary function
     live_data_summary <- get_live_kpi_summary(live_info())
     context_message <- list(role = "system", content = paste0("CURRENT LIVE SYSTEM STATUS: ", live_data_summary))
     
@@ -298,7 +297,7 @@ server <- function(input, output, session) {
   })
   
   # -----------------------------------------------------------------------
-  # DASHBOARD PLOT RENDERING (Existing)
+  # DASHBOARD PLOT RENDERING
   # -----------------------------------------------------------------------
   
   output$summaryOutputPlot1 <- renderPlot({ 

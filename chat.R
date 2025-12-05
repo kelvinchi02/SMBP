@@ -13,22 +13,28 @@ call_chatgpt <- function(messages_list, api_key = NULL, max_retries = 3) {
   GROQ_ENDPOINT <- "https://api.groq.com/openai/v1/chat/completions"
   GROQ_API_KEY <- Sys.getenv("GROQ_API_KEY")
   
-  # Recommended model for high speed/low latency chat interface:
-  MODEL_NAME <- "llama-3-8b-8192" 
+  # Use the model ID from your template
+  MODEL_NAME <- "llama-3.1-8b-instant" 
   
   if (is.null(GROQ_API_KEY) || GROQ_API_KEY == "") {
     return("Error: GROQ_API_KEY environment variable not set. Cannot connect to Groq.")
   }
 
   # --- Request Body Construction (Payload) ---
-  # The input `messages_list` already contains the system prompt, data context, and history
+  # Aligned with your Groq template, but forcing stream=FALSE for R compatibility
   body <- list(
     model = MODEL_NAME,
     messages = messages_list,
-    max_tokens = 250,
-    temperature = 0.5
+    max_tokens = 1024,       # Increased to match template
+    temperature = 1.0,       # Matched template
+    top_p = 1.0,             # Matched template
+    stream = FALSE           # CRITICAL: Keep FALSE for simple JSON parsing in R
   )
   
+  # Debugging: Print the exact JSON being sent (optional, can be removed in prod)
+  # message("--- Sending Request to Groq ---")
+  # print(toJSON(body, auto_unbox=TRUE))
+
   # --- API Call Execution with Exponential Backoff ---
   for (attempt in 1:max_retries) {
     tryCatch({
@@ -50,19 +56,28 @@ call_chatgpt <- function(messages_list, api_key = NULL, max_retries = 3) {
       # Parse response JSON
       result <- resp_body_json(resp, simplifyVector = TRUE)
       
-      # Extract the generated text from the standard OpenAI-compatible response format
-      if (length(result$choices) > 0 && result$choices[[1]]$message$content != "") {
-        return(trimws(result$choices[[1]]$message$content))
-      } else {
-        stop("Received empty or invalid response content from Groq.")
-      }
+      # Extract the generated text 
+      # Standard Groq/OpenAI structure: choices -> [1] -> message -> content
+      if (length(result$choices) > 0) {
+        # Handle potential differences in list vs dataframe structure from jsonlite
+        content <- if(is.data.frame(result$choices)) {
+          result$choices$message$content[1]
+        } else {
+          result$choices[[1]]$message$content
+        }
+        
+        if (!is.null(content) && content != "") {
+          return(trimws(content))
+        }
+      } 
+      
+      stop("Received empty or invalid response content from Groq.")
       
     }, error = function(e) {
       message(paste("[AI ERROR] Attempt", attempt, "failed:", e$message))
       if (attempt < max_retries) {
         Sys.sleep(2^attempt) # Exponential backoff
       } else {
-        # Final fallback message after retries fail
         return("I am currently experiencing connection issues and cannot process your request. Please try again later.")
       }
     })
