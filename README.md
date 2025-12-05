@@ -126,7 +126,6 @@ This dataset serves as the primary source for the analytics dashboard. It contai
 
 ---
 
-## 2. Static Schedule
 **File:** `schedule.csv`
 
 This file defines the planned service structure. It is utilized by the `scheduler.R` module to compare actual performance against targets and by the AI agent to propose schedule injections.
