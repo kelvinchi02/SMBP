@@ -20,23 +20,15 @@ call_chatgpt <- function(messages_list, api_key = NULL, max_retries = 3) {
   }
 
   # --- Request Body Construction ---
-  # CRITICAL FIX: wrapping messages_list in unname() ensures it becomes a JSON Array [ ... ]
-  # instead of a JSON Object { "1": ... }
   body <- list(
     model = MODEL_NAME,
-    messages = unname(messages_list), 
+    messages = unname(messages_list), # Ensure JSON Array structure
     max_tokens = 1024,
     temperature = 1.0,
     top_p = 1.0,
     stream = FALSE
   )
   
-  # >>> DEBUG: Print Raw Request <<<
-  message("\n--- [DEBUG] SENDING REQUEST TO GROQ ---")
-  print(jsonlite::toJSON(body, auto_unbox = TRUE, pretty = TRUE))
-  message("---------------------------------------\n")
-  # >>> END DEBUG <<<
-
   # --- API Call Execution ---
   for (attempt in 1:max_retries) {
     tryCatch({
@@ -50,24 +42,14 @@ call_chatgpt <- function(messages_list, api_key = NULL, max_retries = 3) {
         
       resp <- req_perform(req)
       
-      # >>> DEBUG: Print Raw Response Status <<<
-      message(paste("--- [DEBUG] RESPONSE STATUS:", resp_status(resp), "---"))
-
       if (resp_status(resp) != 200) {
-        err_body <- resp_body_string(resp)
-        message(paste("--- [DEBUG] ERROR BODY:", err_body))
-        stop(paste("HTTP Error:", resp_status(resp), err_body))
+        stop(paste("HTTP Error:", resp_status(resp), resp_body_string(resp)))
       }
       
       result <- resp_body_json(resp, simplifyVector = TRUE)
       
-      # >>> DEBUG: Print Raw Response Body (Truncated) <<<
-      message("--- [DEBUG] RAW RESPONSE (First 500 chars) ---")
-      print(substr(toJSON(result, auto_unbox=TRUE), 1, 500))
-      message("----------------------------------------------\n")
-      
       if (length(result$choices) > 0) {
-        # Robust content extraction
+        # Robust extraction for various JSON structures
         content <- if(is.data.frame(result$choices)) {
           result$choices$message$content[1]
         } else {
