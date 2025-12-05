@@ -2,6 +2,10 @@
 
 ![Status](https://img.shields.io/badge/Status-Live-success) ![R](https://img.shields.io/badge/Language-R-blue) ![Shiny](https://img.shields.io/badge/Framework-Shiny-blueviolet)
 
+
+![SmartTransit Poster](poster.png)
+
+
 ## Overview
 The Smart Bus Management Platform is an enterprise-grade analytics dashboard designed for transit operators. It unifies real-time fleet telemetry, weather data, and passenger demand metrics into a single decision-support system.
 
