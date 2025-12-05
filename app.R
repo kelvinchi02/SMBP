@@ -23,20 +23,9 @@ message(paste("[SYSTEM] Application startup initiated at:", startup_start))
 # -------------------------------------------------------------------------
 
 
-source("database_connection.R")
-source("pre.R")
-source("api_utils.R")
-source("dashboard.R")
-source("login.R")
-source("chat.R")
-source("overview.R")
-source("map.R")
-source("weather.R")
-source("crowd.R")
-source("ridership.R")
-source("hour.R")
-source("styles.R")
-source("scheduler.R") 
+# Source all scripts in the R/ folder automatically
+list.files("R", full.names = TRUE) |> lapply(source)
+
 
 if (dir.exists("www/index")) {
   addResourcePath("index", "www/index")
