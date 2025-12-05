@@ -22,8 +22,6 @@ message(paste("[SYSTEM] Application startup initiated at:", startup_start))
 # 1. SETUP & MODULE LOADING
 # -------------------------------------------------------------------------
 
-if (file.exists(".env")) load_dot_env(".env")
-OPENAI_API_KEY <- Sys.getenv("OPENAI_API_KEY")
 
 source("database_connection.R")
 source("pre.R")
