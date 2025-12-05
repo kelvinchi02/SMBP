@@ -76,7 +76,12 @@ server <- function(input, output, session) {
   observe({
     req(is.null(isolate(local_schedule())) || nrow(isolate(local_schedule())) == 0)
     
-    message("[SYSTEM] Loading schedule (Time-Only Mode)...")
+    # 1. Get Simulation "Current Date" from the Main Database
+    sim_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
+    sim_date <- as.Date(sim_timestamp)
+    
+    message(paste("[SYSTEM] Loading schedule. Aligning to simulation date:", sim_date))
+    
     initial_data <- load_supabase_table("bus_schedule")
     
     if (nrow(initial_data) > 0) {
@@ -151,20 +156,19 @@ server <- function(input, output, session) {
     req(input$chat_message$text, live_info())
     user_message <- input$chat_message$text
     system_persona <- list(role = "system", content = "You are the Smart Transit AI Assistant. Analyze the current live data provided. Provide concise, data-driven answers.")
-    live_context <- list(role = "system", content = paste0("Response according to data and common sense, only reposnse to things that you are certain in.  CURRENT LIVE SYSTEM STATUS:\n", get_live_kpi_summary(live_info())))
+    live_context <- list(role = "system", content = paste0("CURRENT LIVE SYSTEM STATUS:\n", get_live_kpi_summary(live_info())))
     messages_to_send <- list(system_persona, live_context, list(role = "user", content = user_message))
     session$sendCustomMessage("chat_response", call_chatgpt(messages_to_send))
   })
   
-  # --- SCHEDULER MODULE LOGIC (AUTO-SCAN ENABLED) ---
+  # --- SCHEDULER MODULE LOGIC ---
   
   output$schedule_table <- DT::renderDataTable({
     req(live_info()) 
     req(local_schedule())
-    
     sched <- local_schedule()
     
-    # 1. Get Proxy Time from Database
+    # 1. Get Proxy Time
     raw_timestamp <- get_latest_timestamp("SmartTransit_Integrated")
     if (is.character(raw_timestamp)) {
       current_sim_timestamp <- as.POSIXct(raw_timestamp, format="%Y-%m-%dT%H:%M:%S", tz="UTC")
@@ -172,12 +176,11 @@ server <- function(input, output, session) {
     } else {
       current_sim_timestamp <- raw_timestamp
     }
-    
     proxy_time_str <- format(current_sim_timestamp, "%H:%M:%S")
     message(paste("[SCHEDULER] Simulation Proxy Time (HH:MM:SS):", proxy_time_str))
     
+    # 2. Filter schedule
     future_sched <- sched[scheduled_departure > proxy_time_str][order(scheduled_departure)]
-    
     if(nrow(future_sched) == 0) return(NULL)
     
     get_next_10 <- function(r_id) {
@@ -193,27 +196,16 @@ server <- function(input, output, session) {
       stringsAsFactors = FALSE
     )
     display_df[is.na(display_df)] <- "--"
-    
-    DT::datatable(display_df, 
-      options = list(dom = 't', pageLength = 10, ordering = FALSE),
-      rownames = FALSE,
-      class = 'cell-border stripe compact'
-    )
+    DT::datatable(display_df, options = list(dom = 't', pageLength = 10, ordering = FALSE), rownames = FALSE, class = 'cell-border stripe compact')
   })
 
   proposal_state <- reactiveValues(active = FALSE, route = NULL, time = NULL, reason = NULL)
   
-  # -----------------------------------------------------------------------
-  # AUTOMATIC SCANNER LOGIC (New Trigger)
-  # -----------------------------------------------------------------------
-  auto_scan_timer <- reactiveTimer(30000) # Fires every 30 seconds
+  # AUTO-SCANNER
+  auto_scan_timer <- reactiveTimer(30000) 
   
   observe({
-    # Dependency on timer
     auto_scan_timer()
-    
-    # IMPORTANT: Only run if we are in the scheduler view AND no proposal is currently pending
-    # This prevents the AI from overwriting a proposal you are looking at.
     req(current_view() == "scheduler")
     req(!proposal_state$active)
     
@@ -226,8 +218,9 @@ server <- function(input, output, session) {
       analysis <- get_route_crowding_profile(live_info(), r)
       if (is.null(analysis)) next
       
+      # Strict prompt for boolean logic
       prompt <- list(
-        list(role="system", content="You are an Operations AI. Check the profile. If recommendation is YES, output 'DECISION: YES | REASON: [Brief reason]'. If NO, output 'DECISION: NO'."),
+        list(role="system", content="You are an Operations AI. Analyze metrics against these strict rules:\n1. Occupancy > 85%\n2. Delay > 10 min\n3. MaxWaiting > 5\n\nIf ANY condition is met, output 'DECISION: YES | REASON: [Constraint violated]'. If NONE are met, output 'DECISION: NO'."),
         list(role="user", content=analysis$profile_text)
       )
       
@@ -245,7 +238,7 @@ server <- function(input, output, session) {
         
         found_issue <- TRUE
         message(paste("[AUTO-SCAN] Issue found on Route", r))
-        break # Stop scanning once an issue is found
+        break 
       }
     }
     
@@ -254,14 +247,13 @@ server <- function(input, output, session) {
       proposal_state$active <- FALSE
     }
   })
-  # -----------------------------------------------------------------------
   
   output$scheduler_proposal_card <- renderUI({
     if (proposal_state$active) {
       div(class="proposal-card",
         div(class="proposal-route", paste("Add Trip to Route", proposal_state$route)),
         div(class="proposal-time", proposal_state$time),
-        div(class="proposal-impact", "Fills schedule gap to reduce crowding")
+        div(class="proposal-impact", "Midpoint Insertion: Fills schedule gap")
       )
     } else {
       div(class="proposal-card", style="opacity: 0.5;", h4("No Pending Proposals"))
@@ -285,12 +277,7 @@ server <- function(input, output, session) {
     req(proposal_state$active, local_schedule())
     
     new_time_str <- proposal_state$time 
-    
-    new_row <- data.table(
-      route_id = proposal_state$route,
-      scheduled_departure = new_time_str,
-      headway_min = 15
-    )
+    new_row <- data.table(route_id = proposal_state$route, scheduled_departure = new_time_str, headway_min = 15)
     
     current <- local_schedule()
     updated <- rbind(current, new_row, fill = TRUE)

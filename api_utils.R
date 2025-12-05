@@ -6,11 +6,7 @@ library(scales)
 # API UTILITIES (Simulation Mode)
 # -------------------------------------------------------------------------
 
-# ... [Keep your existing Sections 1-6 unchanged] ...
-# (I am including the full file below for completeness to avoid copy-paste errors)
-
 # --- 1. DELAY & PUNCTUALITY ---
-
 get_realtime_kpis <- function(data) {
   if (is.null(data) || nrow(data) == 0) return(list(punctuality=0, avg_delay=0, active_issues=0))
   
@@ -45,7 +41,6 @@ generate_ai_delay_summary <- function() {
 }
 
 # --- 2. RIDERSHIP ---
-
 get_ridership_kpis <- function(data) {
   if (is.null(data) || nrow(data) == 0) return(list(total_passengers="0", avg_occupancy="0%", status="Unknown", status_class="normal"))
 
@@ -92,7 +87,6 @@ add_ridership_trip <- function(route_id, current_headway, current_ridership, ext
 }
 
 # --- 3. CROWDING ---
-
 get_crowding_kpis <- function(data) {
   if (is.null(data) || nrow(data) == 0) return(list(avg_occupancy="0%", risk_zones=0, low_count=0, med_count=0, high_count=0, status="Unknown"))
 
@@ -106,7 +100,6 @@ get_crowding_kpis <- function(data) {
     if(length(val) == 0) return(0) else return(val)
   }
   
-  # Determine status text (for consistency)
   status <- data.table::fcase(
     avg_occ < 0.5, "Normal",
     avg_occ < 0.85, "Busy",
@@ -142,7 +135,6 @@ add_crowding_trip <- function(route_id, current_headway, avg_occupancy, extra_tr
 }
 
 # --- 4. WEATHER ---
-
 get_current_weather <- function(data) {
   if (is.null(data) || nrow(data) == 0) {
     return(list(
@@ -203,7 +195,6 @@ get_ai_weather_advice <- function(current_weather, forecast_conditions, avg_dela
 }
 
 # --- 5. MAP (LIVE VEHICLES) ---
-
 get_live_location <- function(stops_data, selected_route_id) {
   if (is.null(stops_data) || nrow(stops_data) == 0) return(list(vehicles = list()))
   
@@ -215,7 +206,6 @@ get_live_location <- function(stops_data, selected_route_id) {
     
     vehicles <- lapply(1:nrow(active_buses), function(i) {
       stop_data <- active_buses[i]
-      
       list(
         vehicle_id = paste0("BUS-", selected_route_id, "-", i),
         status = sample(c("On Time", "Delayed", "Early"), 1),
@@ -230,12 +220,10 @@ get_live_location <- function(stops_data, selected_route_id) {
   } else {
     vehicles <- list()
   }
-  
   return(list(vehicles = vehicles))
 }
 
 # --- 6. STOP ANALYSIS ---
-
 get_ai_stop_summary <- function(stops_data = NULL, headway_changes = NULL) {
   list(
     analysis = "Stop utilization is uneven. Stop 103 is a bottleneck.",
@@ -248,55 +236,38 @@ get_ai_stop_summary <- function(stops_data = NULL, headway_changes = NULL) {
   )
 }
 
-# --- 7. LIVE DATA SERIALIZATION FOR AI (NEW) ---
-
+# --- 7. LIVE DATA SERIALIZATION FOR AI ---
 get_live_kpi_summary <- function(data) {
   if (is.null(data) || nrow(data) == 0) {
     return("No current operational data available for analysis.")
   }
-  
-  # Calculate required KPIs
   realtime_kpis <- get_realtime_kpis(data)
   crowding_kpis <- get_crowding_kpis(data)
   ridership_kpis <- get_ridership_kpis(data) 
   
-  # Identify the current worst route for delays and crowding
   delay_summary <- data[, .(avg_delay = mean(delay_min, na.rm=TRUE)), by = route_id][order(-avg_delay)][1]
   crowding_summary <- data[, .(avg_occ = mean(occupancy_rate, na.rm=TRUE)), by = route_id][order(-avg_occ)][1]
   
-  # Get current weather condition from the latest record
   latest_record <- tail(data, 1)
-  current_weather <- paste0(
-    latest_record$weather_hourly_conditions[1], 
-    " at ", 
-    round(latest_record$weather_temp_c[1], 1), "°C"
-  )
+  current_weather <- paste0(latest_record$weather_hourly_conditions[1], " at ", round(latest_record$weather_temp_c[1], 1), "°C")
   
-  # --- Assemble the required comprehensive prompt string ---
   summary_string <- paste0(
     "SYSTEM HEALTH: Punctuality=", realtime_kpis$punctuality, "%; AvgDelay=", realtime_kpis$avg_delay, " min. ",
-    "WorstDelayRoute: ", delay_summary$route_id, 
-    " (AvgDelay: ", round(delay_summary$avg_delay, 1), " min). ",
-    
+    "WorstDelayRoute: ", delay_summary$route_id, " (AvgDelay: ", round(delay_summary$avg_delay, 1), " min). ",
     "RIDERSHIP & CAPACITY: AvgOccupancy=", crowding_kpis$avg_occupancy, ". ",
     "CurrentLoadStatus=", ridership_kpis$status, ". ", 
-    "WorstCrowdingRoute: ", crowding_summary$route_id, 
-    " (AvgOcc: ", scales::percent(crowding_summary$avg_occ, accuracy = 1), "). ",
-    
+    "WorstCrowdingRoute: ", crowding_summary$route_id, " (AvgOcc: ", scales::percent(crowding_summary$avg_occ, accuracy = 1), "). ",
     "CROWDING BREAKDOWN (Trips): Low=", crowding_kpis$low_count, "; ",
     "Medium=", crowding_kpis$med_count, "; ",
     "High=", crowding_kpis$high_count, "; ",
     "OverloadRiskZones (>85%): ", crowding_kpis$risk_zones, ". ",
-    
     "ENVIRONMENT: Weather: ", current_weather, "."
   )
-  
   return(summary_string)
 }
 
 
-
-# --- 8. SCHEDULE MANAGEMENT (NEW) ---
+# --- 8. SCHEDULE MANAGEMENT (UPDATED FOR 2-BUS LOOKAHEAD) ---
 
 get_next_scheduled_trip <- function(route_id_target, simulation_time) {
   supabase_url <- Sys.getenv("SUPABASE_URL")
@@ -304,14 +275,14 @@ get_next_scheduled_trip <- function(route_id_target, simulation_time) {
   
   if (supabase_url == "" || supabase_key == "") return(NULL)
   
-  # Format simulation time for query: HH:MM:SS
+  # Logic: Ensure timestamp is formatted to HH:MM:SS for comparison
   sim_time_str <- format(simulation_time, "%H:%M:%S")
   
-  # Query: route_id = target AND scheduled_departure > sim_time
+  # Fetch NEXT 2 trips (Limit = 2) to calculate gap
   endpoint <- paste0(supabase_url, "/rest/v1/bus_schedule",
                      "?route_id=eq.", route_id_target,
                      "&scheduled_departure=gt.", sim_time_str,
-                     "&order=scheduled_departure.asc&limit=1")
+                     "&order=scheduled_departure.asc&limit=2")
   
   tryCatch({
     req <- request(endpoint) |>
@@ -321,8 +292,17 @@ get_next_scheduled_trip <- function(route_id_target, simulation_time) {
     result <- resp_body_json(resp, simplifyVector = TRUE)
     
     if (length(result) > 0) {
+      # Handle case where only 1 trip is returned (End of day)
+      if (nrow(result) == 1) {
+         return(list(
+           next_departure = result$scheduled_departure[1],
+           second_departure = NULL,
+           headway = result$headway_min[1]
+         ))
+      }
       return(list(
         next_departure = result$scheduled_departure[1],
+        second_departure = result$scheduled_departure[2],
         headway = result$headway_min[1]
       ))
     } else {
@@ -333,40 +313,47 @@ get_next_scheduled_trip <- function(route_id_target, simulation_time) {
   })
 }
 
-calculate_smart_insert_time <- function(next_sched, current_simulation_time) {
-  # S (Next Schedule)
-  s_time <- as.POSIXct(paste(Sys.Date(), next_sched$next_departure), format="%Y-%m-%d %H:%M:%S")
+calculate_smart_insert_time <- function(sched_data, current_simulation_time) {
+  # Parse current sim date to attach to time strings
+  sim_date <- as.Date(current_simulation_time)
   
-  # S-1 (Prev Schedule) = S - Headway
-  headway_sec <- next_sched$headway * 60
+  # S1 (Next Bus)
+  t1 <- as.POSIXct(paste(sim_date, sched_data$next_departure), tz="UTC")
   
-  # Calculate Midpoint (Insertion Point) = S - (Headway / 2)
-  half_gap <- headway_sec / 2
-  insert_time <- s_time - half_gap
-  
-  # Robustness: If calculated insertion time is already passed in the simulation,
-  # we suggest inserting in the NEXT interval (S + Headway/2).
-  if (insert_time < current_simulation_time) {
-     insert_time <- s_time + half_gap 
+  # S2 (Bus After Next)
+  if (!is.null(sched_data$second_departure)) {
+    t2 <- as.POSIXct(paste(sim_date, sched_data$second_departure), tz="UTC")
+    
+    # LOGIC: Insert exactly halfway between T1 and T2
+    # Time = T1 + (T2 - T1) / 2
+    gap <- as.numeric(difftime(t2, t1, units = "secs"))
+    insert_time <- t1 + (gap / 2)
+    
+  } else {
+    # Fallback if at end of schedule: Add standard headway
+    insert_time <- t1 + (sched_data$headway * 60)
   }
   
   return(format(insert_time, "%H:%M:%S"))
 }
 
-# --- 9. AI ROUTE PROFILING (NEW) ---
+# --- 9. AI ROUTE PROFILING (UPDATED) ---
 
 get_route_crowding_profile <- function(live_data, route_id_target) {
   route_data <- live_data[route_id == route_id_target]
   
-  if (nrow(route_data) == 0) {
-    return(NULL)
-  }
+  if (nrow(route_data) == 0) return(NULL)
   
   # 1. Determine Simulation Time (Latest update in data)
-  sim_time <- max(route_data$actual_arrival, na.rm = TRUE)
+  # Ensure we handle text vs POSIX correctly
+  if(inherits(route_data$datetime, "character")) {
+     sim_time <- max(as.POSIXct(route_data$datetime), na.rm=TRUE)
+  } else {
+     sim_time <- max(route_data$datetime, na.rm=TRUE)
+  }
   
-  # 2. Metrics (Last 2 records for trend)
-  recent_data <- tail(route_data[order(actual_arrival)], 2)
+  # 2. Metrics (Last 3 records for trend stability)
+  recent_data <- tail(route_data[order(actual_arrival)], 3)
   
   avg_occ <- mean(recent_data$occupancy_rate, na.rm = TRUE)
   max_waiting <- max(recent_data$passengers_waiting, na.rm = TRUE)
@@ -379,17 +366,23 @@ get_route_crowding_profile <- function(live_data, route_id_target) {
   
   if (!is.null(next_schedule)) {
     suggested_insert <- calculate_smart_insert_time(next_schedule, sim_time)
-    schedule_info <- paste0("Next Bus: ", next_schedule$next_departure, " (Headway: ", next_schedule$headway, "m)")
+    schedule_info <- paste0("Next Bus: ", next_schedule$next_departure)
   }
   
-  # 4. Construct Profile
+  # 4. Construct Profile (Strict Instructions for AI)
   profile <- paste0(
     "ROUTE: ", route_id_target, "\n",
     "TIME: ", format(sim_time, "%H:%M:%S"), "\n",
-    "METRICS: Occupancy=", scales::percent(avg_occ, 1), ", MaxWaiting=", max_waiting, ", Delay=", round(avg_delay, 1), "m.\n",
+    "METRICS: Occupancy=", scales::percent(avg_occ, 1), 
+    ", MaxWaiting=", max_waiting, 
+    ", Delay=", round(avg_delay, 1), "m.\n",
     "SCHEDULE: ", schedule_info, "\n",
     "POTENTIAL INSERT: ", suggested_insert, "\n",
-    "TASK: If Occupancy > 85% OR MaxWaiting > 5, recommend YES. Else NO."
+    "DECISION RULES: \n",
+    "1. Occupancy > 85% \n",
+    "2. Delay > 10 min \n",
+    "3. MaxWaiting > 5 people \n",
+    "If ANY of these are true, return YES. Otherwise NO."
   )
   
   return(list(profile_text = profile, suggested_time = suggested_insert))
