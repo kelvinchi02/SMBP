@@ -2,164 +2,154 @@ library(shiny)
 library(bsicons)
 
 # -------------------------------------------------------------------------
-# DASHBOARD HOME (Landing Page)
+# UI DEFINITION (Dashboard UI Shell)
 # -------------------------------------------------------------------------
 
-dashboard_home_content <- function() {
+dashboard_ui <- function(user_name = "Administrator") {
   tagList(
     tags$head(
       tags$style(HTML("
-        .welcome-banner {
-          background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
-          color: white; padding: 3rem 2rem; border-radius: 12px; margin-bottom: 2rem;
-          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        .welcome-title { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
-        .welcome-subtitle { font-size: 1.1rem; opacity: 0.9; font-weight: 300; }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; background-color: #f8f9fa; overflow-x: hidden; }
+        .dashboard-container { display: flex; min-height: 100vh; background-color: #f8f9fa; }
         
-        .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
-        .quick-card { 
-          background: white; padding: 2rem; border-radius: 12px; 
-          border: 1px solid #e9ecef; text-align: center;
-          transition: transform 0.2s, box-shadow 0.2s;
-          cursor: pointer;
-        }
-        .quick-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
-        .quick-icon { font-size: 2.5rem; margin-bottom: 1rem; color: #2c3e50; }
-        .quick-title { font-size: 1.1rem; font-weight: 600; color: #2c3e50; margin-bottom: 0.5rem; }
-        .quick-desc { font-size: 0.85rem; color: #6c757d; line-height: 1.5; }
+        /* Sidebar */
+        .sidebar { width: 260px; background-color: #ffffff; border-right: 1px solid #e9ecef; position: fixed; height: 100vh; left: 0; top: 0; z-index: 1000; }
+        .sidebar-header { padding: 30px 25px; border-bottom: 1px solid #e9ecef; }
+        .sidebar-logo { font-size: 1.4rem; font-weight: 700; color: #2c3e50; text-align: center; }
+        .sidebar-menu { padding: 20px 0; }
+        .menu-item { display: flex; align-items: center; padding: 14px 25px; color: #6c757d; cursor: pointer; transition: all 0.3s; border-left: 3px solid transparent; }
+        .menu-item:hover, .menu-item.active { background-color: #f8f9fa; color: #2c3e50; border-left-color: #2c3e50; font-weight: 500; }
+        .menu-item i { font-size: 1.2rem; width: 24px; margin-right: 12px; }
+        
+        /* Topbar */
+        .topbar { position: fixed; top: 0; left: 260px; right: 0; height: 70px; background-color: #ffffff; border-bottom: 1px solid #e9ecef; display: flex; align-items: center; justify-content: space-between; padding: 0 35px; z-index: 999; }
+        .topbar-title { font-size: 1.5rem; font-weight: 600; color: #2c3e50; }
+        .topbar-user { display: flex; align-items: center; gap: 15px; }
+        .user-name { font-size: 0.9rem; font-weight: 500; color: #2c3e50; }
+        .user-role { font-size: 0.75rem; color: #6c757d; }
+        .logout-btn { padding: 8px 18px; font-size: 0.85rem; color: #6c757d; border: 1px solid #dee2e6; background: transparent; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .logout-btn:hover { color: #e74c3c; border-color: #e74c3c; background-color: #fff5f5; }
+        
+        /* Main Content Area */
+        .main-content { margin-left: 260px; margin-top: 70px; padding: 0; flex: 1; min-height: calc(100vh - 70px); }
+        
+        /* Carousel Styles */
+        .carousel-container { position: relative; height: calc(100vh - 70px); overflow: hidden; background: #fff; }
+        .carousel-slide { display: none; width: 100%; height: 100%; }
+        .carousel-slide.active { display: block; animation: fadeIn 0.5s ease-in-out; }
+        .carousel-slide img { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Placeholder for missing images */
+        .slide-placeholder { width: 100%; height: 100%; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; align-items: center; justify-content: center; flex-direction: column; color: #5f6c7b; }
+        .slide-placeholder i { font-size: 4rem; margin-bottom: 1rem; opacity: 0.5; }
+        
+        .carousel-overlay { position: absolute; top: 15%; right: 5%; width: 55%; z-index: 10; pointer-events: none; }
+        .feature-item { display: none; flex-direction: row-reverse; align-items: center; color: #fff; font-size: 3.5rem; font-weight: 700; padding: 10px; text-shadow: 2px 2px 8px rgba(0,0,0,0.6); text-align: right; }
+        .feature-item.active { display: flex; animation: fadeInRight 0.8s ease-out; }
+        .feature-icon { width: 80px; height: 80px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; margin-left: 25px; box-shadow: 0 8px 20px rgba(102,126,234,0.5); }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInRight { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
       "))
     ),
-    
-    div(class = "page-wrapper",
-      div(class = "page-content",
-        
-        # 1. Welcome Banner
-        div(class = "welcome-banner",
-          div(class = "welcome-title", "Smart Transit Operations Center"),
-          div(class = "welcome-subtitle", "Real-time AI monitoring and schedule optimization platform")
+    div(
+      class = "dashboard-container",
+      
+      # Sidebar
+      div(class = "sidebar",
+        div(class = "sidebar-header", div(class = "sidebar-logo", "Smart Bus Platform")),
+        div(class = "sidebar-menu", id = "sidebar-menu",
+          div(class = "menu-item active", id = "menu-dashboard", onclick = "Shiny.setInputValue('nav_selection', 'dashboard', {priority: 'event'}); updateActiveMenu('dashboard');", bs_icon("house-fill"), span(class="menu-item-text", "Dashboard")),
+          div(class = "menu-item", id = "menu-overview", onclick = "Shiny.setInputValue('nav_selection', 'overview', {priority: 'event'}); updateActiveMenu('overview');", bs_icon("clipboard-data-fill"), span(class="menu-item-text", "Overview")),
+          
+          # AI Scheduling Tab
+          div(class = "menu-item", id = "menu-scheduler", onclick = "Shiny.setInputValue('nav_selection', 'scheduler', {priority: 'event'}); updateActiveMenu('scheduler');", bs_icon("robot"), span(class="menu-item-text", "AI Scheduling")),
+          
+          div(class = "menu-item", id = "menu-delay", onclick = "Shiny.setInputValue('nav_selection', 'delay', {priority: 'event'}); updateActiveMenu('delay');", bs_icon("clock-history"), span(class="menu-item-text", "Delay & Punctuality")),
+          div(class = "menu-item", id = "menu-ridership", onclick = "Shiny.setInputValue('nav_selection', 'ridership', {priority: 'event'}); updateActiveMenu('ridership');", bs_icon("graph-up-arrow"), span(class="menu-item-text", "Ridership Trends")),
+          div(class = "menu-item", id = "menu-crowding", onclick = "Shiny.setInputValue('nav_selection', 'crowding', {priority: 'event'}); updateActiveMenu('crowding');", bs_icon("people-fill"), span(class="menu-item-text", "Crowding Analysis")),
+          div(class = "menu-item", id = "menu-weather", onclick = "Shiny.setInputValue('nav_selection', 'weather', {priority: 'event'}); updateActiveMenu('weather');", bs_icon("cloud-sun-fill"), span(class="menu-item-text", "Weather Impact")),
+          div(class = "menu-item", id = "menu-map", onclick = "Shiny.setInputValue('nav_selection', 'map', {priority: 'event'}); updateActiveMenu('map');", bs_icon("geo-alt-fill"), span(class="menu-item-text", "Stops & Map"))
         ),
-        
-        # 2. Quick Access Grid
-        div(class = "quick-grid",
-          # Card 1: Map
-          div(class = "quick-card", onclick = "Shiny.setInputValue('nav_selection', 'map')",
-            div(class = "quick-icon", "🗺️"),
-            div(class = "quick-title", "Live Map"),
-            div(class = "quick-desc", "Track vehicle locations and route status in real-time.")
-          ),
-          
-          # Card 2: Delays
-          div(class = "quick-card", onclick = "Shiny.setInputValue('nav_selection', 'delay')",
-            div(class = "quick-icon", "⏱️"),
-            div(class = "quick-title", "Delay Analysis"),
-            div(class = "quick-desc", "Identify bottlenecks and monitor schedule adherence.")
-          ),
-          
-          # Card 3: Scheduler
-          div(class = "quick-card", onclick = "Shiny.setInputValue('nav_selection', 'scheduler')",
-            div(class = "quick-icon", "📅"),
-            div(class = "quick-title", "AI Scheduler"),
-            div(class = "quick-desc", "Review and approve AI-suggested schedule optimizations.")
+        tags$script(HTML("
+          function updateActiveMenu(page) {
+            $('.menu-item').removeClass('active');
+            $('#menu-' + page).addClass('active');
+          }
+        "))
+      ),
+      
+      # Main Content Area
+      div(style = "flex: 1;",
+        # Top Bar
+        div(class = "topbar",
+          uiOutput("topbar_title_dynamic"),
+          div(class = "topbar-user",
+            div(class = "user-info", div(class = "user-name", user_name), div(class = "user-role", "System Administrator")),
+            actionButton("logout_btn", "Logout", class = "logout-btn")
           )
-        )
+        ),
+        # Content
+        div(class = "main-content", uiOutput("dashboard_content"))
       )
     )
   )
 }
 
 # -------------------------------------------------------------------------
-# UI DEFINITION (Dashboard UI Shell)
+# CAROUSEL CONTENT (With Image Existence Check)
 # -------------------------------------------------------------------------
 
-dashboard_ui <- function(user_name = "Admin") {
+dashboard_home_content <- function() {
+  
+  # Helper to check image existence
+  render_slide_image <- function(filename) {
+    # Check physical path
+    file_path <- file.path("www", "index", filename)
+    if (file.exists(file_path)) {
+      return(tags$img(src = paste0("index/", filename)))
+    } else {
+      # Fallback UI if image is missing
+      return(div(class = "slide-placeholder", 
+                 bs_icon("image", size = "3rem"), 
+                 h4("Image not found"),
+                 p(paste("Expected:", filename))
+      ))
+    }
+  }
+
   tagList(
-    tags$head(
-      tags$style(HTML("
-        :root { --sidebar-width: 260px; --topbar-height: 70px; }
-        body { background-color: #f8f9fa; font-family: 'Segoe UI', system-ui, sans-serif; }
-        
-        /* Sidebar */
-        .sidebar {
-          position: fixed; top: 0; left: 0; height: 100vh; width: var(--sidebar-width);
-          background-color: #2c3e50; color: white; padding-top: 0; z-index: 100;
-          display: flex; flex-direction: column;
-        }
-        .sidebar-brand {
-          height: var(--topbar-height); display: flex; align-items: center; padding: 0 1.5rem;
-          font-size: 1.25rem; font-weight: 700; background-color: #1a252f; border-bottom: 1px solid #34495e;
-        }
-        .nav-menu { flex: 1; padding: 1.5rem 0; overflow-y: auto; }
-        .nav-item {
-          padding: 0.8rem 1.5rem; color: rgba(255,255,255,0.7); cursor: pointer;
-          display: flex; align-items: center; transition: all 0.2s; font-size: 0.95rem; text-decoration: none;
-        }
-        .nav-item:hover, .nav-item.active { background-color: #34495e; color: white; border-left: 4px solid #3498db; }
-        .nav-icon { width: 24px; margin-right: 12px; text-align: center; }
-        
-        .user-profile {
-          padding: 1.5rem; background-color: #1a252f; border-top: 1px solid #34495e;
-          display: flex; align-items: center; gap: 10px;
-        }
-        .user-avatar {
-          width: 36px; height: 36px; background-color: #3498db; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center; font-weight: 600;
-        }
-        .user-info { font-size: 0.85rem; }
-        .user-name { font-weight: 600; color: white; }
-        .user-role { color: rgba(255,255,255,0.5); font-size: 0.75rem; }
-        
-        /* Main Content */
-        .main-content { margin-left: var(--sidebar-width); min-height: 100vh; }
-        .topbar {
-          height: var(--topbar-height); background: white; border-bottom: 1px solid #e9ecef;
-          display: flex; align-items: center; justify-content: space-between; padding: 0 2rem;
-          position: sticky; top: 0; z-index: 99;
-        }
-      "))
-    ),
-    
-    # JavaScript for Navigation
-    tags$script(HTML("
-      function updateNav(id) {
-        Shiny.setInputValue('nav_selection', id);
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        document.getElementById('nav-' + id).classList.add('active');
-      }
-      $(document).on('shiny:sessioninitialized', function() {
-        updateNav('dashboard');
-      });
-    ")),
-    
-    div(
-      class = "sidebar",
-      div(class = "sidebar-brand", icon("bus"), span(style="margin-left: 10px;", "SmartTransit")),
-      div(
-        class = "nav-menu",
-        tags$a(id="nav-dashboard", class="nav-item", onclick="updateNav('dashboard')", icon("home", class="nav-icon"), "Dashboard"),
-        tags$a(id="nav-overview", class="nav-item", onclick="updateNav('overview')", icon("chart-pie", class="nav-icon"), "Overview"),
-        tags$a(id="nav-map", class="nav-item", onclick="updateNav('map')", icon("map-marked-alt", class="nav-icon"), "Live Map"),
-        tags$a(id="nav-delay", class="nav-item", onclick="updateNav('delay')", icon("clock", class="nav-icon"), "Delay Analysis"),
-        tags$a(id="nav-crowding", class="nav-item", onclick="updateNav('crowding')", icon("users", class="nav-icon"), "Crowding"),
-        tags$a(id="nav-ridership", class="nav-item", onclick="updateNav('ridership')", icon("chart-line", class="nav-icon"), "Ridership"),
-        tags$a(id="nav-weather", class="nav-item", onclick="updateNav('weather')", icon("cloud-sun", class="nav-icon"), "Weather Impact"),
-        tags$a(id="nav-scheduler", class="nav-item", onclick="updateNav('scheduler')", icon("calendar-check", class="nav-icon"), "AI Scheduler")
+    div(class = "carousel-container",
+      div(id = "carousel",
+        div(class = "carousel-slide active", `data-slide`="1", render_slide_image("1.png")), 
+        div(class = "carousel-slide", `data-slide`="2", render_slide_image("2.png")),
+        div(class = "carousel-slide", `data-slide`="3", render_slide_image("3.png"))
       ),
-      div(
-        class = "user-profile",
-        div(class = "user-avatar", substr(user_name, 1, 1)),
-        div(class = "user-info",
-            div(class = "user-name", user_name),
-            div(class = "user-role", "Operations Manager")
-        ),
-        actionButton("logout_btn", "", icon = icon("sign-out-alt"), style="background:none; border:none; color:#e74c3c; margin-left:auto;")
+      div(class = "carousel-overlay",
+        div(class = "carousel-features",
+          div(class = "feature-list",
+            div(class = "feature-item active", `data-slide`="1", tags$span(class="feature-icon", HTML("✨")), tags$span("Provides a clear overview of bus operations")),
+            div(class = "feature-item", `data-slide`="2", tags$span(class="feature-icon", HTML("⚡")), tags$span("Enables faster decision-making via AI insights")),
+            div(class = "feature-item", `data-slide`="3", tags$span(class="feature-icon", HTML("🚀")), tags$span("Real-time passenger flow & vehicle status"))
+          )
+        )
       )
     ),
-    
-    div(
-      class = "main-content",
-      div(class = "topbar", uiOutput("topbar_title_dynamic")),
-      uiOutput("dashboard_content")
-    )
+    tags$script(HTML("
+      $(document).ready(function() {
+        var currentSlide = 1;
+        function showSlide(n) {
+          $('.carousel-slide, .feature-item').removeClass('active');
+          $('[data-slide=\"' + n + '\"]').addClass('active');
+          currentSlide = n;
+        }
+        setInterval(function() {
+          currentSlide = currentSlide >= 3 ? 1 : currentSlide + 1;
+          showSlide(currentSlide);
+        }, 5000);
+      });
+    "))
   )
 }
