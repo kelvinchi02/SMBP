@@ -4,7 +4,7 @@ library(data.table)
 library(bsicons)
 library(scales) # Added for percent_format
 
-source("styles.R")
+
 
 # -------------------------------------------------------------------------
 # UI COMPONENT

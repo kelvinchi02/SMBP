@@ -4,8 +4,6 @@ library(highcharter)
 library(dplyr)
 library(data.table)
 
-source("styles.R")
-source("api_utils.R")
 
 # -------------------------------------------------------------------------
 # UI DEFINITION

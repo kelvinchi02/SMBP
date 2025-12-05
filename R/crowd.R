@@ -3,8 +3,6 @@ library(plotly)
 library(scales)
 library(RColorBrewer)
 
-source("styles.R")
-source("api_utils.R")
 
 # -------------------------------------------------------------------------
 # UI DEFINITION
