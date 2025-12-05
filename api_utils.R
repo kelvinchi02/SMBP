@@ -258,3 +258,50 @@ get_ai_stop_summary <- function(stops_data = NULL, headway_changes = NULL) {
     route_suggestions = list("Review timing points")
   )
 }
+
+# --- 7. LIVE DATA SERIALIZATION FOR AI (CRITICAL NEW FUNCTION) ---
+
+get_live_kpi_summary <- function(data) {
+  if (is.null(data) || nrow(data) == 0) {
+    return("No current operational data available for analysis.")
+  }
+  
+  # Calculate required KPIs (functions defined in Sections 1-4 of api_utils.R)
+  realtime_kpis <- get_realtime_kpis(data)
+  crowding_kpis <- get_crowding_kpis(data)
+  ridership_kpis <- get_ridership_kpis(data) # Used primarily for status text
+  
+  # Identify the current worst route for delays and crowding
+  delay_summary <- data[, .(avg_delay = mean(delay_min, na.rm=TRUE)), by = route_id][order(-avg_delay)][1]
+  crowding_summary <- data[, .(avg_occ = mean(occupancy_rate, na.rm=TRUE)), by = route_id][order(-avg_occ)][1]
+  
+  # Get current weather condition from the latest record
+  latest_record <- tail(data, 1)
+  current_weather <- paste0(
+    latest_record$weather_hourly_conditions[1], 
+    " at ", 
+    round(latest_record$weather_temp_c[1], 1), "°C"
+  )
+  
+  # --- Assemble the required comprehensive prompt string ---
+  # This structure provides the LLM with all necessary context in an easily parsable format.
+  summary_string <- paste0(
+    "SYSTEM HEALTH: Punctuality=", realtime_kpis$punctuality, "%; AvgDelay=", realtime_kpis$avg_delay, " min. ",
+    "WorstDelayRoute: ", delay_summary$route_id, 
+    " (AvgDelay: ", round(delay_summary$avg_delay, 1), " min). ",
+    
+    "RIDERSHIP & CAPACITY: AvgOccupancy=", crowding_kpis$avg_occupancy, ". ",
+    "CurrentLoadStatus=", ridership_kpis$status, ". ", # e.g., Normal/Busy/Overcrowded
+    "WorstCrowdingRoute: ", crowding_summary$route_id, 
+    " (AvgOcc: ", scales::percent(crowding_summary$avg_occ, accuracy = 1), "). ",
+    
+    "CROWDING BREAKDOWN (Trips): Low=", crowding_kpis$low_count, "; ",
+    "Medium=", crowding_kpis$med_count, "; ",
+    "High=", crowding_kpis$high_count, "; ",
+    "OverloadRiskZones (>85%): ", crowding_kpis$risk_zones, ". ",
+    
+    "ENVIRONMENT: Weather: ", current_weather, "."
+  )
+  
+  return(summary_string)
+}

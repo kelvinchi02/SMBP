@@ -1,5 +1,79 @@
-# Chat UI component 
-# (Frontend handles the button, window, and message display)
+# Ensure httr2 and jsonlite are available
+library(httr2)
+library(jsonlite)
+
+# -------------------------------------------------------------------------
+# LLM Integration: Connecting to Groq API (Chat Function)
+# -------------------------------------------------------------------------
+
+# The call_chatgpt function now accepts the full conversation history list
+call_chatgpt <- function(messages_list, api_key = NULL, max_retries = 3) {
+  
+  # --- Configuration ---
+  GROQ_ENDPOINT <- "https://api.groq.com/openai/v1/chat/completions"
+  GROQ_API_KEY <- Sys.getenv("GROQ_API_KEY")
+  
+  # Recommended model for high speed/low latency chat interface:
+  MODEL_NAME <- "llama-3-8b-8192" 
+  
+  if (is.null(GROQ_API_KEY) || GROQ_API_KEY == "") {
+    return("Error: GROQ_API_KEY environment variable not set. Cannot connect to Groq.")
+  }
+
+  # --- Request Body Construction (Payload) ---
+  # The input `messages_list` already contains the system prompt, data context, and history
+  body <- list(
+    model = MODEL_NAME,
+    messages = messages_list,
+    max_tokens = 250,
+    temperature = 0.5
+  )
+  
+  # --- API Call Execution with Exponential Backoff ---
+  for (attempt in 1:max_retries) {
+    tryCatch({
+      req <- request(GROQ_ENDPOINT) |>
+        req_headers(
+          "Authorization" = paste("Bearer", GROQ_API_KEY),
+          "Content-Type" = "application/json"
+        ) |>
+        req_body_json(body) |>
+        req_timeout(30)
+        
+      resp <- req_perform(req)
+      
+      # Check HTTP status code
+      if (resp_status(resp) != 200) {
+        stop(paste("HTTP Error:", resp_status(resp), resp_body_string(resp)))
+      }
+      
+      # Parse response JSON
+      result <- resp_body_json(resp, simplifyVector = TRUE)
+      
+      # Extract the generated text from the standard OpenAI-compatible response format
+      if (length(result$choices) > 0 && result$choices[[1]]$message$content != "") {
+        return(trimws(result$choices[[1]]$message$content))
+      } else {
+        stop("Received empty or invalid response content from Groq.")
+      }
+      
+    }, error = function(e) {
+      message(paste("[AI ERROR] Attempt", attempt, "failed:", e$message))
+      if (attempt < max_retries) {
+        Sys.sleep(2^attempt) # Exponential backoff
+      } else {
+        # Final fallback message after retries fail
+        return("I am currently experiencing connection issues and cannot process your request. Please try again later.")
+      }
+    })
+  }
+  
+  return("I was unable to connect to the AI model after multiple retries.")
+}
+
+# -------------------------------------------------------------------------
+# UI component (retains previous structure)
+# -------------------------------------------------------------------------
 chat_ui <- function() {
   tagList(
     tags$head(
@@ -65,14 +139,14 @@ chat_ui <- function() {
       div(class = "chat-header", h4("Bus System Assistant"), tags$button(class = "chat-close", onclick = "toggleChat()", "×")),
       div(
         class = "chat-messages", id = "chatMessages",
-        div(class = "chat-message message-assistant", div(class = "message-label", "Assistant"), div(class = "message-bubble", "Hello! The AI Assistant is currently undergoing maintenance for a system upgrade. We will be back online soon!"))
+        div(class = "chat-message message-assistant", div(class = "message-label", "Assistant"), div(class = "message-bubble", "Hello! I am your Smart Transit AI Assistant. How can I help you analyze bus operations?"))
       ),
       div(class = "chat-loading", id = "chatLoading", "Thinking..."),
       div(
         class = "chat-input-area",
         div(
           class = "chat-input-group",
-          tags$input(type = "text", class = "chat-input", id = "chatInput", placeholder = "Chat is currently offline...", onkeypress = "if(event.keyCode==13) sendMessage()"),
+          tags$input(type = "text", class = "chat-input", id = "chatInput", placeholder = "Ask about routes, delays, or crowding...", onkeypress = "if(event.keyCode==13) sendMessage()"),
           tags$button(class = "chat-send", id = "chatSend", onclick = "sendMessage()", "Send")
         )
       )
@@ -111,22 +185,4 @@ chat_ui <- function() {
       });
     "))
   )
-}
-
-# ---------------------------------------------------------
-# Placeholder for Future Hugging Face Integration
-# ---------------------------------------------------------
-
-# We keep the function name 'call_chatgpt' for now so app.R doesn't crash,
-# but it now just returns a static message. 
-# You can rename this to 'call_ai_model' later when you update app.R.
-
-call_chatgpt <- function(message, api_key = NULL, max_retries = 3) {
-  
-  # Future: Add httr::POST request to Hugging Face Inference API here
-  
-  # Temporary simulated delay to make it feel "real"
-  Sys.sleep(1)
-  
-  return("The AI system is currently being migrated to a new Hugging Face model. Please check back later for updates.")
 }
