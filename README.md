@@ -1,6 +1,6 @@
 # Smart Bus Management Platform
 
-![Status](https://img.shields.io/badge/Status-Live-success) ![R](https://img.shields.io/badge/Language-R-blue) ![Shiny](https://img.shields.io/badge/Framework-Shiny-blueviolet)
+![Status](https://img.shields.io/badge/Status-Inactive-lightgrey) ![R](https://img.shields.io/badge/Language-R-blue) ![Shiny](https://img.shields.io/badge/Framework-Shiny-blueviolet)
 
 
 ![SmartTransit Poster](poster1.png)
