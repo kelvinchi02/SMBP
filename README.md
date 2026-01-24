@@ -18,8 +18,8 @@ The application is currently deployed and accessible on Posit Cloud:
 
 ### 🔐 Demo Credentials
 To access the full dashboard functionalities, use the following administrative credentials:
-* **Username:** `admin1`
-* **Password:** `admin123`
+* **Username:** 
+* **Password:** 
 
 ---
 
@@ -173,8 +173,8 @@ This file defines the planned service structure. It is utilized by the `schedule
     Create a `.env` file in the root directory:
     ```env
     # App Auth
-    LOGIN_USER=admin1
-    LOGIN_PASS=admin123
+    LOGIN_USER=
+    LOGIN_PASS=
 
     # Supabase (Database)
     SUPABASE_URL=your_supabase_url
